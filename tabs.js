@@ -195,29 +195,98 @@
       return { items, type };
     }
 
+    // Resolve a scope argument (node, array of nodes, or nothing) into an
+    // array of real DOM nodes to operate on.
+    function resolveNodes(scope) {
+      if (!scope) return [document.body];
+      const arr = Array.isArray(scope) ? scope : [scope];
+      return arr.filter(n => n && n.nodeType === 1);
+    }
+
+    // Force lazy / JS-gated content to become visible inside injected markup.
+    // Squarespace hides several block types until its own controllers run
+    // (which they never do on DOM we copied from another page):
+    //   • Responsive images use data-src + ImageLoader and stay blank.
+    //   • Gallery items are hidden via `.gallery-grid-item:not([data-show])`.
+    //   • Background images on sections also use data-src.
+    // This reveals all of them defensively, independent of visibility, so it
+    // works even for tab panels that are currently hidden.
+    function revealLazyContent(scope) {
+      resolveNodes(scope).forEach(node => {
+        // 1. Responsive <img> (content images, gallery images, logos, etc.)
+        try {
+          node.querySelectorAll('img[data-src]').forEach(img => {
+            if (window.ImageLoader && typeof window.ImageLoader.load === 'function') {
+              try {
+                window.ImageLoader.load(img, { load: true });
+              } catch (e) {
+                /* fall through to manual src assignment */
+              }
+            }
+            if (!img.getAttribute('src')) img.setAttribute('src', img.getAttribute('data-src'));
+            img.classList.add('loaded');
+            img.setAttribute('data-loaded', 'true');
+          });
+        } catch (e) {
+          /* no-op */
+        }
+
+        // 2. Section background images (parallax / section backgrounds).
+        try {
+          node.querySelectorAll('.section-background img[data-src], .sqs-background-overlay + img[data-src]').forEach(img => {
+            if (window.ImageLoader && typeof window.ImageLoader.load === 'function') {
+              try {
+                window.ImageLoader.load(img, { load: true });
+              } catch (e) {
+                /* no-op */
+              }
+            }
+          });
+        } catch (e) {
+          /* no-op */
+        }
+
+        // 3. Gallery grid items — hidden by `.gallery-grid-item:not([data-show])`.
+        //    The staggered reveal observer never attached, so mark them shown.
+        try {
+          node.querySelectorAll('.gallery-grid-item').forEach(item => item.setAttribute('data-show', ''));
+        } catch (e) {
+          /* no-op */
+        }
+
+        // 4. Other lazy reveal patterns gated by a "loaded" data flag.
+        try {
+          node.querySelectorAll('[data-loader-loaded="false"]').forEach(el => el.setAttribute('data-loader-loaded', 'true'));
+        } catch (e) {
+          /* no-op */
+        }
+      });
+    }
+
     // Re-run Squarespace's block / embed / commerce initialisation after the
-    // tabs DOM has been (re)built and fetched content injected. Best-effort.
-    async function reloadSquarespaceLifecycle() {
+    // tabs DOM has been (re)built and fetched content injected, then force any
+    // lazy content visible. `scope` limits work to the affected element(s).
+    async function reloadSquarespaceLifecycle(scope) {
+      const nodes = resolveNodes(scope);
       try {
         const Y = window.Y;
         const SQS = window.Squarespace;
         if (SQS && Y) {
-          const root = Y.one(document.body);
           if (typeof SQS.globalInit === 'function') SQS.globalInit(Y);
-          if (typeof SQS.initializeLayoutBlocks === 'function') SQS.initializeLayoutBlocks(Y, root);
-          if (typeof SQS.initializeCommerce === 'function') SQS.initializeCommerce(Y, root);
+          nodes.forEach(node => {
+            const yNode = Y.one(node);
+            if (!yNode) return;
+            if (typeof SQS.initializeLayoutBlocks === 'function') SQS.initializeLayoutBlocks(Y, yNode);
+            if (typeof SQS.initializeCommerce === 'function') SQS.initializeCommerce(Y, yNode);
+          });
           if (typeof SQS.afterBodyLoad === 'function') SQS.afterBodyLoad(Y);
         }
       } catch (e) {
         /* best-effort — never break the page */
       }
-      try {
-        if (window.ImageLoader && typeof window.ImageLoader.load === 'function') {
-          document.querySelectorAll('img[data-src]').forEach(img => window.ImageLoader.load(img, { load: true }));
-        }
-      } catch (e) {
-        /* no-op */
-      }
+
+      revealLazyContent(nodes);
+
       window.dispatchEvent(new Event('resize'));
       window.dispatchEvent(new Event('mercury:load'));
     }
@@ -234,6 +303,7 @@
       throttle,
       collectionData,
       reloadSquarespaceLifecycle,
+      revealLazyContent,
       initializeAllPlugins,
     };
   })();
@@ -1325,6 +1395,15 @@
       const isTabButtonFocused = this.tabs.some(tab => tab.button === document.activeElement);
       if (this.hasLoaded && !isTabButtonFocused) {
         this.activeTab.panel.focus({ preventScroll: true });
+      }
+
+      // Reveal lazy content (gallery images, responsive images) the first time
+      // a panel becomes visible. Galleries that initialised while hidden may
+      // need a resize to lay out, so nudge them once the panel is on screen.
+      if (this.activeTab.panel && !this.activeTab.panel.dataset.sdlRevealed) {
+        this.activeTab.panel.dataset.sdlRevealed = 'true';
+        sdl$.revealLazyContent(this.activeTab.panel);
+        requestAnimationFrame(() => window.dispatchEvent(new Event('resize')));
       }
 
       sdl$?.emitEvent(`${sdlTabs.pluginTitle}:afterOpenTab`, { tabId, instance: this });

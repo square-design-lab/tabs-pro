@@ -682,6 +682,29 @@ body.sqs-edit-mode-active .sqs-block.sqs-block-code:has([data-sdl-plugin="tabs"]
   object-fit: contain !important;
 }
 
+/* Reveal Lazy / JS-Gated Content Inside Tabs
+   Content fetched from collection item pages is injected without Squarespace's
+   gallery / image controllers running, so several block types stay hidden
+   (opacity:0) waiting for a "loaded"/"data-show" flag that never arrives.
+   The plugin JS sets those flags; these rules are a CSS backstop in case the
+   controller timing is missed, guaranteeing the content is visible. */
+.tab-content .gallery-grid-item .gallery-grid-item-wrapper,
+.tab-content .gallery-grid-item:not([data-show]) .gallery-grid-item-wrapper,
+.tab-content .gallery-fullscreen-slideshow-item,
+.tab-content .gallery-reel-item {
+  opacity: 1 !important;
+}
+.tab-content .sqs-gallery-design-grid .slide,
+.tab-content .sqs-gallery-block-grid .slide {
+  opacity: 1 !important;
+}
+/* Lazy responsive images: once src is resolved, ensure they are not held
+   transparent by a pending loader state. */
+.tab-content img[data-src].loaded,
+.tab-content img[data-loaded="true"] {
+  opacity: 1 !important;
+}
+
 /* Layout Engine Inside Fluid Engine */
 .tab-content .sqs-layout .row > .sqs-block,
 .tab-content .sqs-layout .col > .sqs-block {
