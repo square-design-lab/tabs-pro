@@ -95,8 +95,57 @@
       };
     }
 
-    // Fetch a Squarespace collection (e.g. Portfolio) as JSON.
-    // Portfolio items expose `body` (containing #sections), `title`, `assetUrl`.
+    // Extract the page-section markup from an individual collection item's
+    // HTML page. Squarespace 7.1 item pages render their sections inside an
+    // <article> (or #sections / <main>). Returns a "<div id="sections">…</div>"
+    // string so downstream code can locate the sections container uniformly.
+    function extractSectionsFromPageHtml(html) {
+      const doc = new DOMParser().parseFromString(html, 'text/html');
+      // Preferred containers, in priority order.
+      const container =
+        doc.querySelector('article #sections') ||
+        doc.querySelector('#sections') ||
+        doc.querySelector('article') ||
+        doc.querySelector('main') ||
+        doc.body;
+      if (!container) return '';
+
+      // Collect the actual page sections within the container.
+      let sections = container.querySelectorAll(':scope > section.page-section, :scope > section[data-section-id]');
+      if (!sections.length) {
+        sections = container.querySelectorAll('section.page-section, section[data-section-id]');
+      }
+
+      const wrap = document.createElement('div');
+      wrap.id = 'sections';
+      if (sections.length) {
+        sections.forEach(section => wrap.appendChild(section));
+      } else {
+        // Fallback: take the container's inner markup wholesale.
+        wrap.innerHTML = container.innerHTML;
+      }
+      return wrap.outerHTML;
+    }
+
+    // Fetch a single item page and return its sections markup (best-effort).
+    async function fetchItemSections(fullUrl) {
+      try {
+        const res = await fetch(fullUrl, { credentials: 'same-origin', headers: { Accept: 'text/html' } });
+        if (!res.ok) {
+          console.error('sdlTabs: failed to fetch item page ' + fullUrl + ' (HTTP ' + res.status + ')');
+          return '';
+        }
+        const html = await res.text();
+        return extractSectionsFromPageHtml(html);
+      } catch (e) {
+        console.error('sdlTabs: error fetching item page ' + fullUrl, e);
+        return '';
+      }
+    }
+
+    // Fetch a Squarespace collection (e.g. Portfolio). The collection list JSON
+    // does NOT embed each item's page sections, so for portfolio items we fetch
+    // each item's individual page and pull the sections from its <article>.
     async function collectionData(source, options) {
       const opts = options || {};
       let path = source;
@@ -124,9 +173,23 @@
       const items = Array.isArray(data.items) ? data.items : [];
 
       let type = (data.collection && data.collection.typeName) || 'collection';
-      // Robust portfolio detection: portfolio items carry a full page body with #sections.
-      if (type !== 'portfolio' && items.some(it => typeof it.body === 'string' && it.body.indexOf('id="sections"') !== -1)) {
+      // Robust portfolio detection: a portfolio of pages exposes a fullUrl per
+      // item but no inline #sections body in the list JSON.
+      const hasInlineSections = items.some(it => typeof it.body === 'string' && it.body.indexOf('id="sections"') !== -1);
+      if (type !== 'portfolio' && !hasInlineSections && items.length && items.every(it => it.fullUrl)) {
         type = 'portfolio';
+      }
+
+      // For portfolio items without inline sections, fetch each item page and
+      // pull its sections. Done in parallel to keep load time reasonable.
+      if (type === 'portfolio' && !hasInlineSections) {
+        await Promise.all(
+          items.map(async item => {
+            if (item.fullUrl) {
+              item.body = await fetchItemSections(item.fullUrl);
+            }
+          })
+        );
       }
 
       return { items, type };
@@ -529,8 +592,8 @@
 
         if (this.type === 'portfolio') {
           const tempDiv = document.createElement('div');
-          tempDiv.innerHTML = item.body;
-          const pageSectionsContainer = tempDiv.querySelector('#sections');
+          tempDiv.innerHTML = item.body || '';
+          const pageSectionsContainer = tempDiv.querySelector('#sections') || tempDiv;
           while (pageSectionsContainer.firstChild) {
             tabContent.appendChild(pageSectionsContainer.firstChild);
           }
