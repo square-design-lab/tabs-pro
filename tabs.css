@@ -722,6 +722,21 @@ body.sqs-edit-mode-active .sqs-block.sqs-block-code:has([data-sdl-plugin="tabs"]
   box-sizing: border-box;
 }
 
+/* Fluid Engine block spacing
+   Portfolio item pages (7.1) are built with Fluid Engine. When their sections
+   are moved into a tab panel, blocks can inherit stray horizontal padding and
+   incorrect widths. Normalise them the same way a fetched section would behave
+   on its own page. */
+.tab-content .sqs-layout .sqs-block {
+  width: 100%;
+  box-sizing: border-box;
+}
+.tab-content .fe-block > .sqs-block,
+.tab-content .sqs-layout .fe-block > .sqs-block {
+  padding-left: 0px;
+  padding-right: 0px;
+}
+
 /* Override Global Animations */
 [data-override-initial-global-animation].slideIn,
 [data-override-initial-global-animation].fadeIn,
