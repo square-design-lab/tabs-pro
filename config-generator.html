@@ -1,0 +1,1851 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SDL Tabs Pro — Config Generator v1.0</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      --bg-body: #F5F5F7;
+      --bg-sidebar: #FFFFFF;
+      --text-main: #1C1C1E;
+      --text-secondary: #666666;
+      --text-tertiary: #999999;
+      --border-light: #E5E5E5;
+      --border-hover: #D4D4D4;
+      --border-active: #18181B;
+      --accent: #18181B;
+      --accent-hover: #09090B;
+      --accent-contrast: #FFFFFF;
+      --shadow-sm: 0 1px 2px rgba(0,0,0,0.04);
+      --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -1px rgba(0,0,0,0.03);
+      --radius-sm: 6px;
+      --radius-md: 8px;
+      --radius-lg: 12px;
+      --sidebar-width: 360px;
+      --header-height: 60px;
+    }
+
+    * { box-sizing: border-box; outline: none; }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg-body);
+      color: var(--text-main);
+      margin: 0; padding: 0;
+      height: 100vh;
+      display: flex;
+      overflow: hidden;
+      font-size: 13px;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ─── SIDEBAR ─── */
+    .sidebar {
+      width: var(--sidebar-width);
+      background: var(--bg-sidebar);
+      border-right: 1px solid var(--border-light);
+      display: flex;
+      flex-direction: column;
+      z-index: 20;
+      flex-shrink: 0;
+    }
+
+    .sidebar-header {
+      height: var(--header-height);
+      padding: 0 20px;
+      border-bottom: 1px solid var(--border-light);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: rgba(255,255,255,0.9);
+      backdrop-filter: blur(10px);
+      flex-shrink: 0;
+    }
+
+    .sidebar-header h2 {
+      font-size: 14px;
+      font-weight: 700;
+      margin: 0;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      letter-spacing: -0.02em;
+    }
+
+    .brand-icon {
+      width: 28px; height: 28px;
+      background: var(--accent);
+      color: #fff;
+      border-radius: 7px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .badge {
+      font-size: 10px;
+      background: #F4F4F5;
+      padding: 2px 7px;
+      border-radius: 4px;
+      color: #52525B;
+      font-weight: 600;
+      border: 1px solid #D4D4D8;
+    }
+
+    .sidebar-content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 20px;
+    }
+
+    .sidebar-content::-webkit-scrollbar { width: 5px; }
+    .sidebar-content::-webkit-scrollbar-thumb { background: #E5E5E5; border-radius: 3px; }
+    .sidebar-content::-webkit-scrollbar-thumb:hover { background: #CCC; }
+
+    .group { margin-bottom: 20px; border: 1px solid var(--border-light); border-radius: var(--radius-md); overflow: hidden; }
+
+    .group-header {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: var(--text-secondary);
+      padding: 10px 14px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      transition: background 0.15s, color 0.15s;
+      background: #FAFAFA;
+      user-select: none;
+    }
+
+    .group-header:hover { background: #F2F2F2; color: var(--text-main); }
+
+    .group-header svg.chevron {
+      width: 14px; height: 14px;
+      transition: transform 0.2s;
+      opacity: 0.5;
+      flex-shrink: 0;
+    }
+
+    .group.open .group-header svg.chevron { transform: rotate(180deg); }
+
+    .group-body { display: none; padding: 14px; border-top: 1px solid var(--border-light); }
+    .group.open .group-body { display: block; }
+
+    .control-row { margin-bottom: 14px; }
+    .control-row:last-child { margin-bottom: 0; }
+
+    label {
+      display: block;
+      font-size: 12px;
+      font-weight: 500;
+      margin-bottom: 5px;
+      color: var(--text-main);
+    }
+
+    .helper-text {
+      font-size: 11px;
+      color: var(--text-secondary);
+      margin-top: 5px;
+      line-height: 1.4;
+    }
+
+    input[type="text"], input[type="number"], input[type="url"], select {
+      width: 100%;
+      height: 34px;
+      padding: 0 10px;
+      font-family: inherit;
+      font-size: 12px;
+      border: 1px solid var(--border-light);
+      border-radius: var(--radius-sm);
+      background: #fff;
+      color: var(--text-main);
+      transition: border-color 0.15s, box-shadow 0.15s;
+      appearance: none;
+    }
+
+    input:hover, select:hover { border-color: var(--border-hover); }
+    input:focus, select:focus { border-color: var(--border-active); box-shadow: 0 0 0 3px rgba(0,0,0,0.06); }
+
+    select {
+      background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23666' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+      background-repeat: no-repeat;
+      background-position: right 8px center;
+      background-size: 13px;
+      padding-right: 28px;
+      cursor: pointer;
+    }
+
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+      min-height: 22px;
+    }
+
+    .toggle-row label { margin: 0; font-weight: 400; color: var(--text-secondary); cursor: pointer; }
+
+    input[type="checkbox"] {
+      appearance: none;
+      width: 34px; height: 18px;
+      background: #E5E5E5;
+      border-radius: 20px;
+      position: relative;
+      cursor: pointer;
+      transition: 0.2s;
+      border: none;
+      flex-shrink: 0;
+    }
+    input[type="checkbox"]::after {
+      content: '';
+      position: absolute;
+      top: 2px; left: 2px;
+      width: 14px; height: 14px;
+      background: #fff;
+      border-radius: 50%;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.2);
+      transition: 0.2s cubic-bezier(0.4,0,0.2,1);
+    }
+    input[type="checkbox"]:checked { background: var(--accent); }
+    input[type="checkbox"]:checked::after { transform: translateX(16px); }
+
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+
+    .color-row {
+      background: #FAFAFA;
+      padding: 10px 12px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border-light);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .color-chip {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .color-chip .color-label { font-size: 12px; color: var(--text-secondary); }
+
+    input[type="color"] {
+      width: 26px; height: 26px;
+      padding: 0;
+      border: 1.5px solid #C0C0C0;
+      border-radius: 50%;
+      overflow: hidden;
+      cursor: pointer;
+      background: none;
+      flex-shrink: 0;
+    }
+    input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
+    input[type="color"]::-webkit-color-swatch { border: none; border-radius: 50%; }
+
+    .preset-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+
+    .preset-btn {
+      border: 1.5px solid var(--border-light);
+      background: #fff;
+      border-radius: var(--radius-sm);
+      padding: 8px 6px;
+      cursor: pointer;
+      text-align: center;
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--text-secondary);
+      transition: border-color 0.15s, color 0.15s, background 0.15s;
+      font-family: inherit;
+    }
+
+    .preset-btn:hover { border-color: var(--border-hover); color: var(--text-main); }
+    .preset-btn.active { border-color: var(--accent); color: var(--accent); background: #f8f8f8; }
+
+    .preset-preview {
+      width: 100%;
+      height: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 5px;
+      gap: 4px;
+    }
+
+    .preset-dot {
+      width: 20px; height: 20px;
+      background: #ddd;
+      border-radius: 3px;
+      position: relative;
+    }
+
+    /* ─── MAIN CONTENT ─── */
+    .main-content {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      background: var(--bg-body);
+      min-width: 0;
+    }
+
+    .topbar {
+      height: var(--header-height);
+      padding: 0 24px;
+      border-bottom: 1px solid var(--border-light);
+      background: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+    }
+
+    .topbar-left { display: flex; align-items: center; gap: 12px; }
+
+    .device-toggle {
+      background: #F2F2F2;
+      padding: 2px;
+      border-radius: 6px;
+      display: flex;
+    }
+
+    .device-toggle button {
+      border: none;
+      background: transparent;
+      padding: 5px 12px;
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text-secondary);
+      cursor: pointer;
+      border-radius: 4px;
+      transition: 0.15s;
+      font-family: inherit;
+    }
+
+    .device-toggle button.active {
+      background: #fff;
+      color: var(--text-main);
+      box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+    }
+
+    .copy-btn {
+      background: var(--accent);
+      color: var(--accent-contrast);
+      border: none;
+      padding: 8px 18px;
+      border-radius: 7px;
+      font-weight: 600;
+      font-size: 12px;
+      letter-spacing: -0.01em;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: transform 0.1s, background 0.15s;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.18);
+      font-family: inherit;
+    }
+    .copy-btn:hover { background: var(--accent-hover); }
+    .copy-btn:active { transform: scale(0.97); }
+    .copy-btn.copied { background: #0EA5E9; }
+
+    .preview-container {
+      flex: 1;
+      overflow-y: auto;
+      padding: 32px;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      background-image: radial-gradient(#DADADD 1px, transparent 1px);
+      background-size: 18px 18px;
+    }
+
+    #previewFrame {
+      background: #fff;
+      width: 100%;
+      max-width: 1000px;
+      min-height: 500px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.08), 0 0 0 1px rgba(0,0,0,0.04);
+      border-radius: 12px;
+      padding: 40px;
+      transition: width 0.3s cubic-bezier(0.25,0.8,0.25,1), padding 0.3s;
+    }
+
+    #previewFrame.mobile {
+      width: 390px;
+      padding: 20px;
+      border-radius: 28px;
+      border: 8px solid #333;
+      box-shadow: 0 8px 40px rgba(0,0,0,0.18);
+    }
+
+    .code-drawer {
+      height: 220px;
+      background: #0D0D0D;
+      color: #E1E1E1;
+      display: flex;
+      flex-direction: column;
+      border-top: 1px solid #2A2A2A;
+      font-family: 'JetBrains Mono', monospace;
+      flex-shrink: 0;
+    }
+
+    .drawer-header {
+      padding: 8px 20px;
+      background: #161616;
+      border-bottom: 1px solid #2A2A2A;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+    }
+
+    .drawer-header h3 {
+      margin: 0;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: #666;
+    }
+
+    .drawer-tabs { display: flex; gap: 2px; }
+    .drawer-tab {
+      background: none;
+      border: none;
+      color: #666;
+      font-size: 10px;
+      font-family: 'JetBrains Mono', monospace;
+      padding: 4px 10px;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: 0.15s;
+    }
+    .drawer-tab.active { background: #2A2A2A; color: #ccc; }
+
+    #codeOutput {
+      flex: 1;
+      padding: 16px 20px;
+      margin: 0;
+      overflow: auto;
+      font-size: 11.5px;
+      line-height: 1.65;
+      color: #A9B7C6;
+      white-space: pre;
+    }
+
+    #codeOutput .hl-tag   { color: #6B8CAE; }
+    #codeOutput .hl-attr  { color: #E5BF78; }
+    #codeOutput .hl-str   { color: #87C98F; }
+    #codeOutput .hl-cmt   { color: #5A6A5A; }
+    #codeOutput .hl-kw    { color: #C678DD; }
+    #codeOutput .hl-prop  { color: #79B8FF; }
+    #codeOutput .hl-val   { color: #FF9D7C; }
+
+    /* ─── MOCK TABS PREVIEW ─── */
+    .mock-tabs-wrapper {
+      --mock-nav-bg: transparent;
+      --mock-nav-border-color: rgba(0,0,0,0.15);
+      --mock-nav-border-width: 2px;
+      --mock-btn-py: 8px;
+      --mock-btn-px: 18px;
+      --mock-btn-radius: 5px;
+      --mock-btn-bg: transparent;
+      --mock-btn-color: #333;
+      --mock-btn-active-bg: transparent;
+      --mock-btn-active-color: #1a1a1a;
+      --mock-btn-border-width: 0px;
+      --mock-btn-border-color: transparent;
+      --mock-btn-active-border-color: transparent;
+      --mock-indicator-color: #1a1a1a;
+      --mock-indicator-track-bg: transparent;
+      --mock-indicator-size: 100%;
+      --mock-indicator-radius: 4px;
+      --mock-indicator-display: block;
+      --mock-content-padding: 16px;
+      --mock-gap: 8px;
+      --mock-font-size: 13px;
+      --mock-vert-width: 200px;
+      --mock-justify: center;
+      font-family: 'Inter', sans-serif;
+      font-size: 13px;
+      color: #1C1C1E;
+    }
+
+    /* horizontal layout */
+    .mock-tabs-wrapper[data-nav="horizontal"] .mock-tabs-nav-wrap {
+      border-bottom: var(--mock-nav-border-width) solid var(--mock-nav-border-color);
+      padding-bottom: 0;
+      display: flex;
+      justify-content: var(--mock-justify);
+    }
+    .mock-tabs-wrapper[data-nav="horizontal"] .mock-nav {
+      display: flex;
+      gap: var(--mock-gap);
+      background: var(--mock-nav-bg);
+      position: relative;
+      overflow-x: auto;
+      padding-bottom: var(--mock-nav-border-width);
+    }
+    .mock-tabs-wrapper[data-nav="horizontal"] .mock-content-area {
+      padding-top: var(--mock-content-padding);
+    }
+
+    /* vertical layout */
+    .mock-tabs-wrapper[data-nav="vertical"] .mock-tabs-body {
+      display: grid;
+      grid-template-columns: var(--mock-vert-width) 1fr;
+      gap: 0;
+    }
+    .mock-tabs-wrapper[data-nav="vertical"] .mock-tabs-nav-wrap {
+      border-right: var(--mock-nav-border-width) solid var(--mock-nav-border-color);
+      padding-right: 0;
+    }
+    .mock-tabs-wrapper[data-nav="vertical"] .mock-nav {
+      display: flex;
+      flex-direction: column;
+      gap: var(--mock-gap);
+      background: var(--mock-nav-bg);
+      position: relative;
+      padding-right: calc(var(--mock-nav-border-width));
+    }
+    .mock-tabs-wrapper[data-nav="vertical"] .mock-content-area {
+      padding-left: var(--mock-content-padding);
+    }
+
+    /* select layout */
+    .mock-tabs-wrapper[data-nav="select"] .mock-select-wrap {
+      display: block;
+      position: relative;
+      margin-bottom: var(--mock-content-padding);
+    }
+    .mock-tabs-wrapper[data-nav="select"] .mock-select-btn {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+      padding: 8px 12px;
+      border: 1px solid rgba(0,0,0,0.2);
+      border-radius: 5px;
+      background: #fff;
+      font-family: 'Inter', sans-serif;
+      font-size: var(--mock-font-size);
+      cursor: pointer;
+      color: #333;
+    }
+    .mock-tabs-wrapper[data-nav="select"] .mock-select-btn svg { width: 14px; height: 14px; opacity: 0.5; }
+    .mock-tabs-wrapper[data-nav="select"] .mock-tabs-nav-wrap { display: none; }
+
+    /* accordion layout */
+    .mock-tabs-wrapper[data-nav="accordion"] .mock-tabs-nav-wrap { display: none; }
+    .mock-tabs-wrapper[data-nav="accordion"] .mock-accordion-item {
+      border-bottom: var(--mock-nav-border-width) solid var(--mock-nav-border-color);
+    }
+    .mock-tabs-wrapper[data-nav="accordion"] .mock-accordion-btn {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+      padding: var(--mock-btn-py) var(--mock-btn-px);
+      background: var(--mock-btn-bg);
+      color: var(--mock-btn-color);
+      border: none;
+      cursor: pointer;
+      font-family: 'Inter', sans-serif;
+      font-size: var(--mock-font-size);
+      font-weight: 500;
+      text-align: left;
+    }
+    .mock-tabs-wrapper[data-nav="accordion"] .mock-accordion-btn.active {
+      background: var(--mock-btn-active-bg);
+      color: var(--mock-btn-active-color);
+    }
+    .mock-tabs-wrapper[data-nav="accordion"] .mock-accordion-btn svg { width: 16px; height: 16px; opacity: 0.5; transition: transform 0.25s; }
+    .mock-tabs-wrapper[data-nav="accordion"] .mock-accordion-btn.active svg { transform: rotate(180deg); }
+    .mock-accordion-panel {
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.3s ease, padding 0.3s ease;
+    }
+    .mock-accordion-panel.open {
+      max-height: 300px;
+      padding: 12px var(--mock-btn-px);
+    }
+
+    /* nav buttons */
+    .mock-nav-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: var(--mock-btn-py) var(--mock-btn-px);
+      background: var(--mock-btn-bg);
+      color: var(--mock-btn-color);
+      border: var(--mock-btn-border-width) solid var(--mock-btn-border-color);
+      border-radius: var(--mock-btn-radius);
+      cursor: pointer;
+      font-family: 'Inter', sans-serif;
+      font-size: var(--mock-font-size);
+      font-weight: 500;
+      transition: background 0.15s, color 0.15s, opacity 0.15s;
+      position: relative;
+      z-index: 1;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .mock-nav-btn:hover { opacity: 0.7; }
+    .mock-nav-btn.active {
+      background: var(--mock-btn-active-bg);
+      color: var(--mock-btn-active-color);
+      border-color: var(--mock-btn-active-border-color);
+      opacity: 1;
+    }
+
+    /* tab images in buttons */
+    .mock-nav-btn .mock-tab-img {
+      width: 60px;
+      height: 60px;
+      border-radius: var(--mock-btn-radius);
+      object-fit: cover;
+      display: block;
+    }
+    .mock-nav-btn.with-image { flex-direction: column; }
+
+    /* Active indicator */
+    .mock-indicator-track {
+      display: var(--mock-indicator-display);
+      position: absolute;
+      background: var(--mock-indicator-track-bg);
+    }
+    .mock-tabs-wrapper[data-nav="horizontal"] .mock-indicator-track {
+      bottom: 0; left: 0;
+      width: 100%;
+      height: var(--mock-indicator-size);
+    }
+    .mock-tabs-wrapper[data-nav="vertical"] .mock-indicator-track {
+      top: 0; right: 0;
+      height: 100%;
+      width: var(--mock-indicator-size);
+    }
+    .mock-active-indicator {
+      position: absolute;
+      background: var(--mock-indicator-color);
+      border-radius: var(--mock-indicator-radius);
+      transition: left 0.25s ease, top 0.25s ease, width 0.25s ease, height 0.25s ease;
+    }
+
+    /* content panels */
+    .mock-content-area { position: relative; }
+    .mock-panel {
+      display: none;
+      min-height: 180px;
+    }
+    .mock-panel.active { display: block; }
+
+    .mock-placeholder {
+      background: linear-gradient(135deg, #F0F0F8 0%, #E8EAF0 100%);
+      border-radius: 8px;
+      padding: 28px 24px;
+      min-height: 160px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .mock-placeholder-title {
+      width: 55%;
+      height: 16px;
+      background: rgba(0,0,0,0.1);
+      border-radius: 4px;
+    }
+
+    .mock-placeholder-line {
+      height: 10px;
+      background: rgba(0,0,0,0.07);
+      border-radius: 3px;
+    }
+
+    .mock-placeholder-image {
+      width: 100%;
+      height: 80px;
+      background: rgba(0,0,0,0.06);
+      border-radius: 6px;
+      margin-bottom: 4px;
+    }
+
+    /* Mobile tabs */
+    .mobile-tabs { display: none; }
+
+    @media (max-width: 960px) {
+      body { flex-direction: column; overflow: hidden; }
+      .main-content { display: none; }
+      .sidebar {
+        position: fixed;
+        top: 0; left: 0; right: 0;
+        bottom: calc(64px + env(safe-area-inset-bottom));
+        width: 100%;
+        border-right: none;
+        display: none;
+        flex-direction: column;
+        z-index: 50;
+      }
+      .mobile-tabs {
+        display: flex;
+        position: fixed; bottom: 0; left: 0; right: 0;
+        background: #fff;
+        border-top: 1px solid #E5E5E5;
+        z-index: 100;
+        height: 64px;
+        padding: 8px 12px;
+        padding-bottom: calc(8px + env(safe-area-inset-bottom));
+        gap: 6px;
+        align-items: stretch;
+      }
+      .tab-btn {
+        flex: 1; border: none; background: transparent;
+        color: var(--text-tertiary);
+        font-size: 11px; font-weight: 500;
+        font-family: inherit; cursor: pointer;
+        border-radius: 10px;
+        display: flex; flex-direction: column;
+        align-items: center; justify-content: center;
+        gap: 3px; transition: background 0.15s, color 0.15s;
+      }
+      .tab-btn.active { background: var(--accent); color: #fff; }
+      body.tab-edit .sidebar { display: flex; }
+      body.tab-preview .main-content {
+        display: flex;
+        position: fixed; top: 0; left: 0; right: 0;
+        bottom: calc(64px + env(safe-area-inset-bottom));
+        height: auto;
+      }
+      body.tab-preview .code-drawer { display: none; }
+      body.tab-code .main-content {
+        display: flex;
+        position: fixed; top: 0; left: 0; right: 0;
+        bottom: calc(64px + env(safe-area-inset-bottom));
+        height: auto;
+      }
+      body.tab-code .preview-container { display: none; }
+      body.tab-code .code-drawer { flex: 1; height: auto; }
+    }
+  </style>
+</head>
+
+<body class="tab-edit">
+
+  <!-- Mobile bottom tabs -->
+  <div class="mobile-tabs">
+    <button class="tab-btn active" onclick="setMobileTab('edit')">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      Settings
+    </button>
+    <button class="tab-btn" onclick="setMobileTab('preview')">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+      Preview
+    </button>
+    <button class="tab-btn" onclick="setMobileTab('code')">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+      Code
+    </button>
+  </div>
+
+  <!-- ─── SIDEBAR ─── -->
+  <div class="sidebar">
+    <div class="sidebar-header">
+      <h2>
+        <span class="brand-icon">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="3" width="18" height="4" rx="1"/><rect x="3" y="3" width="5" height="18" rx="1"/><rect x="9" y="9" width="12" height="3" rx="1"/><rect x="9" y="14" width="8" height="3" rx="1"/>
+          </svg>
+        </span>
+        SDL Tabs Pro <span class="badge">v1.0</span>
+      </h2>
+    </div>
+
+    <div class="sidebar-content">
+
+      <!-- CDN / Installation URLs -->
+      <div class="group open">
+        <div class="group-header" onclick="togGroup(this)">
+          CDN URLs
+          <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+        </div>
+        <div class="group-body">
+          <div class="control-row">
+            <label>CSS File URL</label>
+            <input type="url" id="cssUrl" value="https://cdn.jsdelivr.net/gh/YOUR_GITHUB/sdl-tabs@latest/tabs.css" placeholder="https://...tabs.css">
+            <div class="helper-text">URL to tabs.css hosted on your CDN or Squarespace file storage (/s/tabs.css).</div>
+          </div>
+          <div class="control-row">
+            <label>JS File URL</label>
+            <input type="url" id="jsUrl" value="https://cdn.jsdelivr.net/gh/YOUR_GITHUB/sdl-tabs@latest/tabs.js" placeholder="https://...tabs.js">
+            <div class="helper-text">URL to tabs.js hosted on your CDN or Squarespace file storage (/s/tabs.js).</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Source & Content -->
+      <div class="group open">
+        <div class="group-header" onclick="togGroup(this)">
+          Source & Content
+          <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+        </div>
+        <div class="group-body">
+          <div class="control-row">
+            <label>Portfolio URL Slug</label>
+            <input type="text" id="source" value="/portfolio" placeholder="/your-portfolio-slug">
+            <div class="helper-text">The URL slug of your Squarespace Portfolio collection (e.g. /tabs-content).</div>
+          </div>
+          <div class="control-row">
+            <label>Tab Limit</label>
+            <input type="number" id="tabLimit" value="" placeholder="All (leave empty)">
+            <div class="helper-text">Limit the number of tabs rendered. Leave empty for all.</div>
+          </div>
+          <div class="toggle-row">
+            <label for="tabImages">Show Tab Images</label>
+            <input type="checkbox" id="tabImages">
+          </div>
+          <div class="control-row" id="tabButtonTagRow">
+            <label>Tab Button Tag</label>
+            <select id="tabButtonTag">
+              <option value="h4" selected>h4 (default)</option>
+              <option value="h3">h3</option>
+              <option value="h2">h2</option>
+              <option value="span">span</option>
+              <option value="p">p</option>
+            </select>
+            <div class="helper-text">HTML tag wrapping the tab label text.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Navigation Layout -->
+      <div class="group open">
+        <div class="group-header" onclick="togGroup(this)">
+          Navigation Layout
+          <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+        </div>
+        <div class="group-body">
+          <div class="control-row">
+            <label>Desktop Navigation Type</label>
+            <select id="desktopNavType">
+              <option value="horizontal" selected>Horizontal (tab bar)</option>
+              <option value="vertical">Vertical (sidebar)</option>
+              <option value="accordion">Accordion</option>
+              <option value="select">Select (dropdown)</option>
+            </select>
+          </div>
+          <div class="control-row">
+            <label>Mobile Navigation Type</label>
+            <select id="mobileNavType">
+              <option value="select" selected>Select (dropdown)</option>
+              <option value="horizontal">Horizontal (tab bar)</option>
+              <option value="accordion">Accordion</option>
+              <option value="vertical">Vertical (sidebar)</option>
+            </select>
+          </div>
+          <div class="control-row">
+            <label>Navigation Alignment</label>
+            <select id="navJustify">
+              <option value="center" selected>Center</option>
+              <option value="flex-start">Left</option>
+              <option value="flex-end">Right</option>
+            </select>
+          </div>
+          <div class="control-row" id="vertWidthRow" style="display:none">
+            <label>Vertical Nav Width (px)</label>
+            <input type="number" id="vertNavWidth" value="250" min="100" max="500">
+          </div>
+          <div class="control-row">
+            <label>Overflow Arrow Action</label>
+            <select id="overflowAction">
+              <option value="scroll" selected>Scroll nav bar</option>
+              <option value="move">Jump to next/prev tab</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- Behavior -->
+      <div class="group">
+        <div class="group-header" onclick="togGroup(this)">
+          Behavior
+          <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+        </div>
+        <div class="group-body">
+          <div class="control-row">
+            <label>Trigger Event</label>
+            <select id="triggerEvent">
+              <option value="click" selected>Click</option>
+              <option value="hover">Hover</option>
+            </select>
+          </div>
+          <div class="toggle-row">
+            <label for="stickyNav">Sticky Navigation</label>
+            <input type="checkbox" id="stickyNav">
+          </div>
+          <div class="control-row" id="stickyOffsetRow" style="display:none">
+            <label>Sticky Nav Offset (px)</label>
+            <input type="number" id="stickyNavOffset" value="17">
+            <div class="helper-text">Distance from the top of the viewport.</div>
+          </div>
+          <div class="toggle-row">
+            <label for="updateUrl">Update URL Hash</label>
+            <input type="checkbox" id="updateUrl">
+          </div>
+          <div class="toggle-row">
+            <label for="scrollBack">Scroll Back to Top</label>
+            <input type="checkbox" id="scrollBack" checked>
+          </div>
+          <div class="control-row" id="scrollOffsetRow">
+            <label>Scroll Back Offset (px)</label>
+            <input type="number" id="scrollBackOffset" value="150">
+          </div>
+          <div class="control-row" id="scrollBehaviorRow">
+            <label>Scroll Behavior</label>
+            <select id="scrollBackBehavior">
+              <option value="auto" selected>Auto (instant)</option>
+              <option value="smooth">Smooth</option>
+            </select>
+          </div>
+          <div class="toggle-row">
+            <label for="touchSwipe">Allow Touch Swipe</label>
+            <input type="checkbox" id="touchSwipe">
+          </div>
+          <div class="toggle-row">
+            <label for="clickDrag">Allow Click & Drag</label>
+            <input type="checkbox" id="clickDrag">
+          </div>
+          <div class="toggle-row">
+            <label for="centerActiveTab">Center Active Tab in Nav</label>
+            <input type="checkbox" id="centerActiveTab">
+          </div>
+          <div class="toggle-row">
+            <label for="edgeToEdge">Edge-to-Edge Content</label>
+            <input type="checkbox" id="edgeToEdge">
+          </div>
+        </div>
+      </div>
+
+      <!-- Style Preset -->
+      <div class="group open">
+        <div class="group-header" onclick="togGroup(this)">
+          Style Preset
+          <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+        </div>
+        <div class="group-body">
+          <div class="preset-grid">
+            <button class="preset-btn active" id="preset-underline" onclick="applyPreset('underline')">
+              <div class="preset-preview">
+                <div style="width:36px;height:18px;border-bottom:2px solid #333;display:flex;align-items:center;justify-content:center;font-size:9px;color:#333;font-weight:600;">Tab</div>
+                <div style="width:36px;height:18px;border-bottom:2px solid transparent;display:flex;align-items:center;justify-content:center;font-size:9px;color:#999;">Tab</div>
+              </div>
+              Underline
+            </button>
+            <button class="preset-btn" id="preset-filled" onclick="applyPreset('filled')">
+              <div class="preset-preview">
+                <div style="width:36px;height:18px;background:#333;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:9px;color:#fff;font-weight:600;">Tab</div>
+                <div style="width:36px;height:18px;background:transparent;display:flex;align-items:center;justify-content:center;font-size:9px;color:#999;">Tab</div>
+              </div>
+              Filled
+            </button>
+            <button class="preset-btn" id="preset-pill" onclick="applyPreset('pill')">
+              <div class="preset-preview">
+                <div style="width:36px;height:18px;background:#333;border-radius:20px;display:flex;align-items:center;justify-content:center;font-size:9px;color:#fff;font-weight:600;">Tab</div>
+                <div style="width:36px;height:18px;border:1px solid #ddd;border-radius:20px;display:flex;align-items:center;justify-content:center;font-size:9px;color:#999;">Tab</div>
+              </div>
+              Pill
+            </button>
+            <button class="preset-btn" id="preset-bordered" onclick="applyPreset('bordered')">
+              <div class="preset-preview">
+                <div style="width:36px;height:18px;border:1.5px solid #333;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:9px;color:#333;font-weight:600;">Tab</div>
+                <div style="width:36px;height:18px;border:1.5px solid #ddd;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:9px;color:#999;">Tab</div>
+              </div>
+              Bordered
+            </button>
+            <button class="preset-btn" id="preset-minimal" onclick="applyPreset('minimal')">
+              <div class="preset-preview">
+                <div style="width:36px;height:18px;display:flex;align-items:center;justify-content:center;font-size:9px;color:#333;font-weight:700;text-decoration:underline;">Tab</div>
+                <div style="width:36px;height:18px;display:flex;align-items:center;justify-content:center;font-size:9px;color:#999;">Tab</div>
+              </div>
+              Minimal
+            </button>
+            <button class="preset-btn" id="preset-custom" onclick="applyPreset('custom')">
+              <div class="preset-preview">
+                <div style="display:flex;align-items:center;justify-content:center;font-size:18px;">✦</div>
+              </div>
+              Custom
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab Button Styling -->
+      <div class="group">
+        <div class="group-header" onclick="togGroup(this)">
+          Tab Button Style
+          <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+        </div>
+        <div class="group-body">
+          <div class="grid-2" style="margin-bottom:14px">
+            <div>
+              <label>Padding Y (px)</label>
+              <input type="number" id="btnPaddingY" value="8" min="0">
+            </div>
+            <div>
+              <label>Padding X (px)</label>
+              <input type="number" id="btnPaddingX" value="18" min="0">
+            </div>
+          </div>
+          <div class="grid-2" style="margin-bottom:14px">
+            <div>
+              <label>Border Radius (px)</label>
+              <input type="number" id="btnRadius" value="5" min="0">
+            </div>
+            <div>
+              <label>Border Width (px)</label>
+              <input type="number" id="btnBorderWidth" value="0" min="0">
+            </div>
+          </div>
+          <div class="control-row">
+            <label>Gap Between Buttons (px)</label>
+            <input type="number" id="navGap" value="8" min="0">
+          </div>
+          <div class="control-row">
+            <label>Font Size</label>
+            <select id="btnFontSize">
+              <option value="inherit" selected>Inherit</option>
+              <option value="12px">12px</option>
+              <option value="13px">13px</option>
+              <option value="14px">14px</option>
+              <option value="15px">15px</option>
+              <option value="16px">16px</option>
+              <option value="18px">18px</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- Colors -->
+      <div class="group">
+        <div class="group-header" onclick="togGroup(this)">
+          Colors
+          <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+        </div>
+        <div class="group-body">
+          <div class="control-row">
+            <label>Default State</label>
+            <div class="color-row">
+              <div class="color-chip">
+                <span class="color-label">Button Background</span>
+                <input type="color" id="btnBg" value="#ffffff" data-transparent>
+              </div>
+              <div class="color-chip">
+                <span class="color-label">Button Text</span>
+                <input type="color" id="btnColor" value="#333333">
+              </div>
+              <div class="color-chip">
+                <span class="color-label">Border Color</span>
+                <input type="color" id="btnBorderColor" value="#dddddd">
+              </div>
+            </div>
+            <div class="toggle-row" style="margin-top:8px">
+              <label for="btnBgTransparent">Transparent Background</label>
+              <input type="checkbox" id="btnBgTransparent" checked>
+            </div>
+          </div>
+          <div class="control-row">
+            <label>Active State</label>
+            <div class="color-row">
+              <div class="color-chip">
+                <span class="color-label">Active Background</span>
+                <input type="color" id="btnActiveBg" value="#1a1a1a">
+              </div>
+              <div class="color-chip">
+                <span class="color-label">Active Text</span>
+                <input type="color" id="btnActiveColor" value="#ffffff">
+              </div>
+              <div class="color-chip">
+                <span class="color-label">Active Border</span>
+                <input type="color" id="btnActiveBorderColor" value="#1a1a1a">
+              </div>
+            </div>
+            <div class="toggle-row" style="margin-top:8px">
+              <label for="btnActiveBgTransparent">Transparent Active Background</label>
+              <input type="checkbox" id="btnActiveBgTransparent">
+            </div>
+          </div>
+          <div class="control-row">
+            <label>Navigation</label>
+            <div class="color-row">
+              <div class="color-chip">
+                <span class="color-label">Border Color</span>
+                <input type="color" id="navBorderColor" value="#e0e0e0">
+              </div>
+              <div class="color-chip">
+                <span class="color-label">Nav Background</span>
+                <input type="color" id="navBg" value="#ffffff">
+              </div>
+            </div>
+            <div class="toggle-row" style="margin-top:8px">
+              <label for="navBgTransparent">Transparent Nav Background</label>
+              <input type="checkbox" id="navBgTransparent" checked>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Active Indicator -->
+      <div class="group">
+        <div class="group-header" onclick="togGroup(this)">
+          Active Indicator
+          <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+        </div>
+        <div class="group-body">
+          <div class="toggle-row">
+            <label for="indicatorEnabled">Show Indicator</label>
+            <input type="checkbox" id="indicatorEnabled" checked>
+          </div>
+          <div id="indicatorSettings">
+            <div class="control-row">
+              <label>Indicator Style</label>
+              <select id="indicatorStyle">
+                <option value="underline" selected>Underline (bottom border)</option>
+                <option value="background">Full Background</option>
+                <option value="pill">Pill / Capsule</option>
+                <option value="dot">Dot (bottom center)</option>
+                <option value="track">Track + Thumb</option>
+              </select>
+            </div>
+            <div class="color-row" style="margin-bottom:12px">
+              <div class="color-chip">
+                <span class="color-label">Indicator Color</span>
+                <input type="color" id="indicatorColor" value="#1a1a1a">
+              </div>
+              <div class="color-chip">
+                <span class="color-label">Track Color</span>
+                <input type="color" id="indicatorTrackColor" value="#e5e5e5">
+              </div>
+            </div>
+            <div class="grid-2">
+              <div>
+                <label>Track Size</label>
+                <input type="number" id="indicatorTrackSize" value="2" min="1">
+              </div>
+              <div>
+                <label>Border Radius (px)</label>
+                <input type="number" id="indicatorRadius" value="4" min="0">
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Content Area -->
+      <div class="group">
+        <div class="group-header" onclick="togGroup(this)">
+          Content Area
+          <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+        </div>
+        <div class="group-body">
+          <div class="control-row">
+            <label>Padding Top (px)</label>
+            <input type="number" id="contentPaddingTop" value="8" min="0">
+            <div class="helper-text">Space between the navigation and content.</div>
+          </div>
+          <div class="control-row">
+            <label>Nav Border Width (px)</label>
+            <input type="number" id="navBorderWidth" value="2" min="0">
+          </div>
+          <div class="toggle-row">
+            <label for="contentBorder">Content Border</label>
+            <input type="checkbox" id="contentBorder">
+          </div>
+          <div id="contentBorderSettings" style="display:none">
+            <div class="control-row">
+              <label>Border Width (px)</label>
+              <input type="number" id="contentBorderWidth" value="1" min="0">
+            </div>
+            <div class="color-row">
+              <div class="color-chip">
+                <span class="color-label">Border Color</span>
+                <input type="color" id="contentBorderColor" value="#e0e0e0">
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ─── MAIN CONTENT ─── -->
+  <div class="main-content">
+    <div class="topbar">
+      <div class="topbar-left">
+        <div class="device-toggle">
+          <button id="desktopBtn" class="active" onclick="setDevice('desktop')">Desktop</button>
+          <button id="mobileBtn" onclick="setDevice('mobile')">Mobile</button>
+        </div>
+      </div>
+      <button class="copy-btn" id="copyBtn" onclick="copyCode()">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/></svg>
+        Copy Code
+      </button>
+    </div>
+
+    <div class="preview-container">
+      <div id="previewFrame">
+        <div class="mock-tabs-wrapper" id="mockWrapper" data-nav="horizontal">
+          <!-- injected by JS -->
+        </div>
+      </div>
+    </div>
+
+    <div class="code-drawer">
+      <div class="drawer-header">
+        <h3>Installation Code</h3>
+        <div class="drawer-tabs">
+          <button class="drawer-tab active" onclick="setCodeTab('html')">Code Block</button>
+          <button class="drawer-tab" onclick="setCodeTab('head')">Head Injection</button>
+          <button class="drawer-tab" onclick="setCodeTab('css')">Custom CSS</button>
+        </div>
+      </div>
+      <pre id="codeOutput"></pre>
+    </div>
+  </div>
+
+  <script>
+    /* ─── MOCK TAB LABELS ─── */
+    const MOCK_TABS = [
+      { label: 'Overview', color: '#EDE9FE' },
+      { label: 'Features', color: '#DCFCE7' },
+      { label: 'Gallery',  color: '#FEF3C7' },
+      { label: 'Contact',  color: '#FCE7F3' },
+    ];
+
+    let currentDevice = 'desktop';
+    let currentCodeTab = 'html';
+    let activeTabIndex = 0;
+    let currentPreset = 'underline';
+
+    /* ─── PRESET DEFINITIONS ─── */
+    const PRESETS = {
+      underline: {
+        btnBg: 'transparent', btnBgTransparent: true,
+        btnColor: '#444444',
+        btnActiveBg: 'transparent', btnActiveBgTransparent: true,
+        btnActiveColor: '#1a1a1a',
+        btnBorderWidth: 0, btnRadius: 0,
+        indicatorEnabled: true, indicatorStyle: 'underline',
+        indicatorColor: '#1a1a1a', indicatorTrackColor: 'transparent',
+        indicatorTrackSize: 2, indicatorRadius: 0,
+        navBg: 'transparent', navBgTransparent: true,
+        navBorderWidth: 2,
+      },
+      filled: {
+        btnBg: '#f4f4f4', btnBgTransparent: false,
+        btnColor: '#555555',
+        btnActiveBg: '#1a1a1a', btnActiveBgTransparent: false,
+        btnActiveColor: '#ffffff',
+        btnBorderWidth: 0, btnRadius: 6,
+        indicatorEnabled: false, indicatorStyle: 'background',
+        indicatorColor: '#1a1a1a', indicatorTrackColor: 'transparent',
+        indicatorTrackSize: 100, indicatorRadius: 6,
+        navBg: '#f4f4f4', navBgTransparent: false,
+        navBorderWidth: 0,
+      },
+      pill: {
+        btnBg: 'transparent', btnBgTransparent: true,
+        btnColor: '#666666',
+        btnActiveBg: '#1a1a1a', btnActiveBgTransparent: false,
+        btnActiveColor: '#ffffff',
+        btnBorderWidth: 0, btnRadius: 40,
+        indicatorEnabled: false, indicatorStyle: 'pill',
+        indicatorColor: '#1a1a1a', indicatorTrackColor: 'transparent',
+        indicatorTrackSize: 100, indicatorRadius: 40,
+        navBg: 'transparent', navBgTransparent: true,
+        navBorderWidth: 0,
+      },
+      bordered: {
+        btnBg: 'transparent', btnBgTransparent: true,
+        btnColor: '#555555',
+        btnActiveBg: '#1a1a1a', btnActiveBgTransparent: false,
+        btnActiveColor: '#ffffff',
+        btnBorderWidth: 1, btnRadius: 6,
+        btnBorderColor: '#d0d0d0', btnActiveBorderColor: '#1a1a1a',
+        indicatorEnabled: false, indicatorStyle: 'background',
+        indicatorColor: '#1a1a1a', indicatorTrackColor: 'transparent',
+        indicatorTrackSize: 100, indicatorRadius: 6,
+        navBg: 'transparent', navBgTransparent: true,
+        navBorderWidth: 0,
+      },
+      minimal: {
+        btnBg: 'transparent', btnBgTransparent: true,
+        btnColor: '#888888',
+        btnActiveBg: 'transparent', btnActiveBgTransparent: true,
+        btnActiveColor: '#1a1a1a',
+        btnBorderWidth: 0, btnRadius: 0,
+        indicatorEnabled: false, indicatorStyle: 'underline',
+        indicatorColor: '#1a1a1a', indicatorTrackColor: 'transparent',
+        indicatorTrackSize: 2, indicatorRadius: 0,
+        navBg: 'transparent', navBgTransparent: true,
+        navBorderWidth: 0,
+      },
+    };
+
+    function applyPreset(name) {
+      currentPreset = name;
+      document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+      const btn = document.getElementById('preset-' + name);
+      if (btn) btn.classList.add('active');
+      if (name === 'custom') { renderPreview(); renderCode(); return; }
+
+      const p = PRESETS[name];
+      if (!p) return;
+
+      setVal('btnBgTransparent', p.btnBgTransparent);
+      if (!p.btnBgTransparent) setVal('btnBg', p.btnBg);
+      setVal('btnColor', p.btnColor);
+      setVal('btnActiveBgTransparent', p.btnActiveBgTransparent);
+      if (!p.btnActiveBgTransparent) setVal('btnActiveBg', p.btnActiveBg);
+      setVal('btnActiveColor', p.btnActiveColor);
+      setVal('btnBorderWidth', p.btnBorderWidth);
+      setVal('btnRadius', p.btnRadius);
+      if (p.btnBorderColor) setVal('btnBorderColor', p.btnBorderColor);
+      if (p.btnActiveBorderColor) setVal('btnActiveBorderColor', p.btnActiveBorderColor);
+      setVal('indicatorEnabled', p.indicatorEnabled);
+      setVal('indicatorStyle', p.indicatorStyle);
+      setVal('indicatorColor', p.indicatorColor);
+      setVal('indicatorTrackColor', p.indicatorTrackColor);
+      setVal('indicatorTrackSize', p.indicatorTrackSize);
+      setVal('indicatorRadius', p.indicatorRadius);
+      setVal('navBgTransparent', p.navBgTransparent);
+      if (!p.navBgTransparent) setVal('navBg', p.navBg);
+      setVal('navBorderWidth', p.navBorderWidth);
+
+      syncConditionalVisibility();
+      renderPreview();
+      renderCode();
+    }
+
+    function setVal(id, val) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      if (el.type === 'checkbox') el.checked = val;
+      else el.value = val;
+    }
+
+    function getVal(id) {
+      const el = document.getElementById(id);
+      if (!el) return '';
+      if (el.type === 'checkbox') return el.checked;
+      return el.value;
+    }
+
+    /* ─── GROUP TOGGLE ─── */
+    function togGroup(header) {
+      header.closest('.group').classList.toggle('open');
+    }
+
+    /* ─── DEVICE TOGGLE ─── */
+    function setDevice(dev) {
+      currentDevice = dev;
+      document.getElementById('previewFrame').classList.toggle('mobile', dev === 'mobile');
+      document.getElementById('desktopBtn').classList.toggle('active', dev === 'desktop');
+      document.getElementById('mobileBtn').classList.toggle('active', dev === 'mobile');
+      renderPreview();
+    }
+
+    /* ─── MOBILE NAV TABS ─── */
+    function setMobileTab(tab) {
+      document.body.className = 'tab-' + tab;
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      const activeBtn = document.querySelector(`.tab-btn[onclick="setMobileTab('${tab}')"]`);
+      if (activeBtn) activeBtn.classList.add('active');
+      if (tab === 'preview') renderPreview();
+    }
+
+    /* ─── CODE TAB ─── */
+    function setCodeTab(tab) {
+      currentCodeTab = tab;
+      document.querySelectorAll('.drawer-tab').forEach((b, i) => {
+        b.classList.toggle('active', ['html','head','css'][i] === tab);
+      });
+      renderCode();
+    }
+
+    /* ─── CONDITIONAL VISIBILITY ─── */
+    function syncConditionalVisibility() {
+      const stickyNav = getVal('stickyNav');
+      const scrollBack = getVal('scrollBack');
+      const desktopNav = getVal('desktopNavType');
+      const indicatorOn = getVal('indicatorEnabled');
+      const contentBorderOn = getVal('contentBorder');
+
+      document.getElementById('stickyOffsetRow').style.display = stickyNav ? '' : 'none';
+      document.getElementById('scrollOffsetRow').style.display = scrollBack ? '' : 'none';
+      document.getElementById('scrollBehaviorRow').style.display = scrollBack ? '' : 'none';
+      document.getElementById('vertWidthRow').style.display = desktopNav === 'vertical' ? '' : 'none';
+      document.getElementById('indicatorSettings').style.display = indicatorOn ? '' : 'none';
+      document.getElementById('contentBorderSettings').style.display = contentBorderOn ? '' : 'none';
+    }
+
+    /* ─── PREVIEW RENDERER ─── */
+    function getNavType() {
+      const isMobile = currentDevice === 'mobile';
+      return isMobile ? getVal('mobileNavType') : getVal('desktopNavType');
+    }
+
+    function renderPreview() {
+      const wrapper = document.getElementById('mockWrapper');
+      const navType = getNavType();
+      wrapper.setAttribute('data-nav', navType);
+
+      const btnBg = getVal('btnBgTransparent') ? 'transparent' : getVal('btnBg');
+      const btnColor = getVal('btnColor');
+      const btnActiveBg = getVal('btnActiveBgTransparent') ? 'transparent' : getVal('btnActiveBg');
+      const btnActiveColor = getVal('btnActiveColor');
+      const btnBorderWidth = getVal('btnBorderWidth');
+      const btnBorderColor = getVal('btnBorderColor');
+      const btnActiveBorderColor = getVal('btnActiveBorderColor');
+      const btnRadius = getVal('btnRadius');
+      const navGap = getVal('navGap');
+      const btnPy = getVal('btnPaddingY');
+      const btnPx = getVal('btnPaddingX');
+      const btnFontSize = getVal('btnFontSize');
+      const navBorderWidth = getVal('navBorderWidth');
+      const navBorderColor = getVal('navBorderColor');
+      const navBg = getVal('navBgTransparent') ? 'transparent' : getVal('navBg');
+      const contentPadding = getVal('contentPaddingTop');
+      const indicatorOn = getVal('indicatorEnabled');
+      const indicatorStyle = getVal('indicatorStyle');
+      const indicatorColor = getVal('indicatorColor');
+      const indicatorTrackColor = getVal('indicatorTrackColor');
+      const indicatorTrackSize = getVal('indicatorTrackSize');
+      const indicatorRadius = getVal('indicatorRadius');
+      const vertWidth = getVal('vertNavWidth');
+      const navJustify = getVal('navJustify');
+      const tabImages = getVal('tabImages');
+
+      // compute indicator CSS vars
+      let indTrackSize = '100%';
+      let indBg = indicatorColor;
+      let indHeight = '', indWidth = '', indBorderRadius = indicatorRadius + 'px';
+
+      if (!indicatorOn) {
+        indBg = 'transparent';
+        wrapper.style.setProperty('--mock-indicator-display', 'none');
+      } else {
+        wrapper.style.setProperty('--mock-indicator-display', 'block');
+      }
+
+      wrapper.style.setProperty('--mock-btn-py', btnPy + 'px');
+      wrapper.style.setProperty('--mock-btn-px', btnPx + 'px');
+      wrapper.style.setProperty('--mock-btn-radius', btnRadius + 'px');
+      wrapper.style.setProperty('--mock-btn-bg', btnBg);
+      wrapper.style.setProperty('--mock-btn-color', btnColor);
+      wrapper.style.setProperty('--mock-btn-active-bg', btnActiveBg);
+      wrapper.style.setProperty('--mock-btn-active-color', btnActiveColor);
+      wrapper.style.setProperty('--mock-btn-border-width', btnBorderWidth + 'px');
+      wrapper.style.setProperty('--mock-btn-border-color', btnBorderColor);
+      wrapper.style.setProperty('--mock-btn-active-border-color', btnActiveBorderColor);
+      wrapper.style.setProperty('--mock-gap', navGap + 'px');
+      wrapper.style.setProperty('--mock-font-size', btnFontSize === 'inherit' ? '13px' : btnFontSize);
+      wrapper.style.setProperty('--mock-nav-bg', navBg);
+      wrapper.style.setProperty('--mock-nav-border-color', navBorderColor);
+      wrapper.style.setProperty('--mock-nav-border-width', navBorderWidth + 'px');
+      wrapper.style.setProperty('--mock-content-padding', contentPadding + 'px');
+      wrapper.style.setProperty('--mock-vert-width', vertWidth + 'px');
+      wrapper.style.setProperty('--mock-justify', navJustify);
+      wrapper.style.setProperty('--mock-indicator-color', indicatorOn ? indicatorColor : 'transparent');
+      wrapper.style.setProperty('--mock-indicator-track-bg', indicatorOn ? indicatorTrackColor : 'transparent');
+
+      if (navType === 'accordion') {
+        renderAccordion(wrapper, tabImages);
+        return;
+      }
+      if (navType === 'select') {
+        renderSelect(wrapper, tabImages);
+        return;
+      }
+
+      // horizontal / vertical
+      wrapper.innerHTML = `
+        <div class="mock-tabs-body">
+          <div class="mock-tabs-nav-wrap">
+            <nav class="mock-nav" style="position:relative">
+              <div class="mock-indicator-track" id="mockTrack">
+                <span class="mock-active-indicator" id="mockIndicator"></span>
+              </div>
+              ${MOCK_TABS.map((t, i) => `
+                <button class="mock-nav-btn${i === activeTabIndex ? ' active' : ''}" data-idx="${i}" onclick="switchTab(${i})">
+                  ${tabImages ? `<img class="mock-tab-img" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='60'%3E%3Crect width='60' height='60' fill='${encodeURIComponent(t.color)}'/%3E%3C/svg%3E">` : ''}
+                  ${t.label}
+                </button>`).join('')}
+            </nav>
+          </div>
+          <div class="mock-content-area">
+            ${MOCK_TABS.map((t, i) => `
+              <div class="mock-panel${i === activeTabIndex ? ' active' : ''}">
+                <div class="mock-placeholder" style="background:linear-gradient(135deg,${t.color}88,${t.color}44)">
+                  <div class="mock-placeholder-title"></div>
+                  <div class="mock-placeholder-image"></div>
+                  <div class="mock-placeholder-line" style="width:90%"></div>
+                  <div class="mock-placeholder-line" style="width:75%"></div>
+                  <div class="mock-placeholder-line" style="width:60%"></div>
+                </div>
+              </div>`).join('')}
+          </div>
+        </div>`;
+
+      positionIndicator(indicatorStyle, indicatorOn, indicatorTrackSize, indicatorRadius);
+    }
+
+    function renderSelect(wrapper, tabImages) {
+      const activeLabel = MOCK_TABS[activeTabIndex].label;
+      wrapper.innerHTML = `
+        <div class="mock-select-wrap">
+          <button class="mock-select-btn">
+            <span>${activeLabel}</span>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
+        </div>
+        <div class="mock-tabs-nav-wrap"></div>
+        <div class="mock-content-area" style="padding-top:0">
+          ${MOCK_TABS.map((t, i) => `
+            <div class="mock-panel${i === activeTabIndex ? ' active' : ''}">
+              <div class="mock-placeholder" style="background:linear-gradient(135deg,${t.color}88,${t.color}44)">
+                <div class="mock-placeholder-title"></div>
+                <div class="mock-placeholder-image"></div>
+                <div class="mock-placeholder-line" style="width:85%"></div>
+                <div class="mock-placeholder-line" style="width:70%"></div>
+              </div>
+            </div>`).join('')}
+        </div>`;
+    }
+
+    function renderAccordion(wrapper, tabImages) {
+      wrapper.innerHTML = `
+        <div class="mock-tabs-body">
+          <div class="mock-tabs-nav-wrap"></div>
+          <div>
+            ${MOCK_TABS.map((t, i) => `
+              <div class="mock-accordion-item">
+                <button class="mock-accordion-btn${i === activeTabIndex ? ' active' : ''}" onclick="switchTab(${i})">
+                  ${t.label}
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+                </button>
+                <div class="mock-accordion-panel${i === activeTabIndex ? ' open' : ''}">
+                  <div class="mock-placeholder" style="background:linear-gradient(135deg,${t.color}88,${t.color}44)">
+                    <div class="mock-placeholder-title"></div>
+                    <div class="mock-placeholder-line" style="width:80%"></div>
+                    <div class="mock-placeholder-line" style="width:65%"></div>
+                  </div>
+                </div>
+              </div>`).join('')}
+          </div>
+        </div>`;
+    }
+
+    function switchTab(idx) {
+      activeTabIndex = idx;
+      renderPreview();
+    }
+
+    function positionIndicator(style, enabled, trackSize, radius) {
+      if (!enabled) return;
+      const nav = document.querySelector('.mock-nav');
+      const indicator = document.getElementById('mockIndicator');
+      const track = document.getElementById('mockTrack');
+      if (!nav || !indicator) return;
+
+      const activeBtn = nav.querySelector('.mock-nav-btn.active');
+      if (!activeBtn) return;
+
+      const navType = getNavType();
+
+      if (style === 'underline') {
+        if (navType === 'horizontal') {
+          indicator.style.cssText = `left:${activeBtn.offsetLeft}px; bottom:0; width:${activeBtn.offsetWidth}px; height:${trackSize}px; border-radius:${radius}px ${radius}px 0 0;`;
+        } else {
+          indicator.style.cssText = `top:${activeBtn.offsetTop}px; right:0; height:${activeBtn.offsetHeight}px; width:${trackSize}px; border-radius:${radius}px 0 0 ${radius}px;`;
+        }
+      } else if (style === 'background' || style === 'pill') {
+        indicator.style.cssText = `left:${activeBtn.offsetLeft}px; top:${activeBtn.offsetTop}px; width:${activeBtn.offsetWidth}px; height:${activeBtn.offsetHeight}px; border-radius:${radius}px; z-index:0; opacity:1;`;
+      } else if (style === 'dot') {
+        const dotLeft = activeBtn.offsetLeft + activeBtn.offsetWidth / 2 - 3;
+        indicator.style.cssText = `left:${dotLeft}px; bottom:0; width:6px; height:6px; border-radius:50%;`;
+      } else if (style === 'track') {
+        if (navType === 'horizontal') {
+          indicator.style.cssText = `left:${activeBtn.offsetLeft}px; bottom:0; width:${activeBtn.offsetWidth}px; height:${trackSize}px; border-radius:${radius}px;`;
+        } else {
+          indicator.style.cssText = `top:${activeBtn.offsetTop}px; right:0; height:${activeBtn.offsetHeight}px; width:${trackSize}px; border-radius:${radius}px;`;
+        }
+        if (track) track.style.background = getVal('indicatorTrackColor');
+      }
+    }
+
+    /* ─── CODE RENDERER ─── */
+    function buildDataAttrs() {
+      const attrs = [];
+      const source = getVal('source');
+      if (source) attrs.push(`  data-source="${source}"`);
+
+      const desktopNav = getVal('desktopNavType');
+      const mobileNav = getVal('mobileNavType');
+      attrs.push(`  data-desktop-navigation-type="${desktopNav}"`);
+      attrs.push(`  data-mobile-navigation-type="${mobileNav}"`);
+
+      const tabImages = getVal('tabImages');
+      if (tabImages) attrs.push(`  data-tab-images="true"`);
+
+      const tabLimit = getVal('tabLimit');
+      if (tabLimit) attrs.push(`  data-tab-limit="${tabLimit}"`);
+
+      const tabButtonTag = getVal('tabButtonTag');
+      if (tabButtonTag !== 'h4') attrs.push(`  data-tab-button-tag="${tabButtonTag}"`);
+
+      const triggerEvent = getVal('triggerEvent');
+      if (triggerEvent !== 'click') attrs.push(`  data-trigger-event="${triggerEvent}"`);
+
+      const stickyNav = getVal('stickyNav');
+      if (stickyNav) {
+        attrs.push(`  data-sticky-nav="true"`);
+        const offset = getVal('stickyNavOffset');
+        if (offset !== '17') attrs.push(`  data-sticky-nav-offset="${offset}"`);
+      }
+
+      const updateUrl = getVal('updateUrl');
+      if (updateUrl) attrs.push(`  data-update-url="true"`);
+
+      const scrollBack = getVal('scrollBack');
+      if (!scrollBack) {
+        attrs.push(`  data-scroll-back-to-top="false"`);
+      } else {
+        const offset = getVal('scrollBackOffset');
+        if (offset !== '150') attrs.push(`  data-scroll-back-offset="${offset}"`);
+        const behavior = getVal('scrollBackBehavior');
+        if (behavior !== 'auto') attrs.push(`  data-scroll-back-behavior="${behavior}"`);
+      }
+
+      const touchSwipe = getVal('touchSwipe');
+      if (touchSwipe) attrs.push(`  data-allow-touch-swipe="true"`);
+
+      const clickDrag = getVal('clickDrag');
+      if (clickDrag) attrs.push(`  data-allow-click-and-drag="true"`);
+
+      const centerActive = getVal('centerActiveTab');
+      if (centerActive) attrs.push(`  data-center-active-tab="true"`);
+
+      const edgeToEdge = getVal('edgeToEdge');
+      if (edgeToEdge) attrs.push(`  data-edge-to-edge="true"`);
+
+      const overflowAction = getVal('overflowAction');
+      if (overflowAction !== 'scroll') attrs.push(`  data-overflow-indicator-action="${overflowAction}"`);
+
+      return attrs;
+    }
+
+    function buildCssVars() {
+      const vars = [];
+
+      const btnBg = getVal('btnBgTransparent') ? 'transparent' : getVal('btnBg');
+      const btnActiveBg = getVal('btnActiveBgTransparent') ? 'transparent' : getVal('btnActiveBg');
+      const navBg = getVal('navBgTransparent') ? 'transparent' : getVal('navBg');
+
+      if (btnBg !== 'transparent') vars.push(`  --tab-button-background: ${btnBg};`);
+      if (getVal('btnColor') !== '#333333') vars.push(`  --tab-button-color: ${getVal('btnColor')};`);
+      if (btnActiveBg !== 'transparent') vars.push(`  --tab-button-active-background: ${btnActiveBg};`);
+      if (getVal('btnActiveColor') !== '#ffffff') vars.push(`  --tab-button-active-color: ${getVal('btnActiveColor')};`);
+
+      const btnBorderWidth = getVal('btnBorderWidth');
+      if (btnBorderWidth !== '0') {
+        vars.push(`  --tab-button-border-width: ${btnBorderWidth}px;`);
+        vars.push(`  --tab-button-border-color: ${getVal('btnBorderColor')};`);
+        vars.push(`  --tab-button-active-border-color: ${getVal('btnActiveBorderColor')};`);
+      }
+
+      const btnRadius = getVal('btnRadius');
+      if (btnRadius !== '5') vars.push(`  --tab-button-border-radius: ${btnRadius}px;`);
+
+      const btnPy = getVal('btnPaddingY');
+      if (btnPy !== '8') vars.push(`  --tab-button-padding-y: ${btnPy}px;`);
+      const btnPx = getVal('btnPaddingX');
+      if (btnPx !== '18') vars.push(`  --tab-button-padding-x: ${btnPx}px;`);
+
+      const btnFontSize = getVal('btnFontSize');
+      if (btnFontSize !== 'inherit') vars.push(`  --tab-button-font-size: ${btnFontSize};`);
+
+      const navGap = getVal('navGap');
+      if (navGap !== '8') vars.push(`  --tabs-header-gap: ${navGap}px;`);
+
+      if (navBg !== 'transparent') vars.push(`  --nav-background-color: ${navBg};`);
+
+      const navBorderWidth = getVal('navBorderWidth');
+      if (navBorderWidth !== '2') vars.push(`  --tabs-nav-border-width: ${navBorderWidth}px;`);
+      if (getVal('navBorderColor') !== '#e0e0e0') vars.push(`  --tabs-nav-border-color: ${getVal('navBorderColor')};`);
+
+      const indicatorOn = getVal('indicatorEnabled');
+      if (!indicatorOn) {
+        vars.push(`  --tab-indicator-display: none;`);
+      } else {
+        const iColor = getVal('indicatorColor');
+        vars.push(`  --active-indicator-color: ${iColor};`);
+        const iTrack = getVal('indicatorTrackColor');
+        if (iTrack !== '#e5e5e5' && iTrack !== 'transparent') vars.push(`  --tab-indicator-track-background: ${iTrack};`);
+        const iSize = getVal('indicatorTrackSize');
+        vars.push(`  --tab-indicator-track-size: ${iSize}px;`);
+        const iRadius = getVal('indicatorRadius');
+        if (iRadius !== '4') vars.push(`  --active-indicator-border-radius: ${iRadius}px;`);
+      }
+
+      const contentPadding = getVal('contentPaddingTop');
+      if (contentPadding !== '8') vars.push(`  --tab-content-padding-start: ${contentPadding}px;`);
+
+      const contentBorder = getVal('contentBorder');
+      if (contentBorder) {
+        vars.push(`  --tab-content-border-width: ${getVal('contentBorderWidth')}px;`);
+        vars.push(`  --tab-content-border-color: ${getVal('contentBorderColor')};`);
+      }
+
+      const desktopNav = getVal('desktopNavType');
+      if (desktopNav === 'vertical') {
+        vars.push(`  --vertical-tabs-navbar-width: ${getVal('vertNavWidth')}px;`);
+      }
+
+      const navJustify = getVal('navJustify');
+      if (navJustify !== 'center') vars.push(`  --nav-justify-items: ${navJustify};`);
+
+      return vars;
+    }
+
+    function renderCode() {
+      const output = document.getElementById('codeOutput');
+      const cssUrl = getVal('cssUrl');
+      const jsUrl = getVal('jsUrl');
+      const attrs = buildDataAttrs();
+      const cssVars = buildCssVars();
+
+      if (currentCodeTab === 'html') {
+        const hasCssVars = cssVars.length > 0;
+        let code = '';
+        if (hasCssVars) {
+          code += `<span class="hl-tag">&lt;style&gt;</span>\n`;
+          code += `<span class="hl-attr">[data-sdl-plugin="tabs"]</span> {\n`;
+          cssVars.forEach(v => {
+            const [prop, val] = v.split(':');
+            code += `  <span class="hl-prop">${prop.trim()}</span>: <span class="hl-val">${val?.trim()}</span>\n`;
+          });
+          code += `}\n`;
+          code += `<span class="hl-tag">&lt;/style&gt;</span>\n\n`;
+        }
+        code += `<span class="hl-tag">&lt;div</span>\n`;
+        code += `  <span class="hl-attr">data-sdl-plugin</span>=<span class="hl-str">"tabs"</span>\n`;
+        attrs.forEach(a => {
+          const eqIdx = a.indexOf('=');
+          const attrName = a.slice(0, eqIdx).trim();
+          const attrVal = a.slice(eqIdx + 1).trim();
+          code += `  <span class="hl-attr">${attrName}</span>=<span class="hl-str">${escHtml(attrVal)}</span>\n`;
+        });
+        code += `<span class="hl-tag">&gt;&lt;/div&gt;</span>`;
+        output.innerHTML = code;
+
+      } else if (currentCodeTab === 'head') {
+        let code = `<span class="hl-cmt">&lt;!-- SDL Tabs Pro: Add to Settings → Advanced → Code Injection → Header --&gt;</span>\n`;
+        code += `<span class="hl-tag">&lt;link</span> <span class="hl-attr">rel</span>=<span class="hl-str">"stylesheet"</span> <span class="hl-attr">href</span>=<span class="hl-str">"${escHtml(cssUrl)}"</span><span class="hl-tag">&gt;</span>\n\n`;
+        code += `<span class="hl-cmt">&lt;!-- SDL Tabs Pro: Add to Settings → Advanced → Code Injection → Footer --&gt;</span>\n`;
+        code += `<span class="hl-tag">&lt;script</span> <span class="hl-attr">src</span>=<span class="hl-str">"${escHtml(jsUrl)}"</span><span class="hl-tag">&gt;&lt;/script&gt;</span>`;
+        output.innerHTML = code;
+
+      } else if (currentCodeTab === 'css') {
+        if (cssVars.length === 0) {
+          output.innerHTML = `<span class="hl-cmt">/* No CSS overrides needed — all settings are using defaults. */</span>`;
+        } else {
+          let code = `<span class="hl-cmt">/* SDL Tabs Pro — Custom CSS Overrides */</span>\n`;
+          code += `<span class="hl-cmt">/* Add to Settings → Advanced → Custom CSS */</span>\n\n`;
+          code += `<span class="hl-attr">[data-sdl-plugin="tabs"]</span> {\n`;
+          cssVars.forEach(v => {
+            const [prop, val] = v.split(':');
+            code += `  <span class="hl-prop">${prop.trim()}</span>: <span class="hl-val">${val?.trim()}</span>\n`;
+          });
+          code += `}`;
+          output.innerHTML = code;
+        }
+      }
+    }
+
+    function escHtml(str) {
+      return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    /* ─── COPY CODE ─── */
+    function copyCode() {
+      const cssUrl = getVal('cssUrl');
+      const jsUrl = getVal('jsUrl');
+      const attrs = buildDataAttrs();
+      const cssVars = buildCssVars();
+
+      let text = '';
+
+      if (currentCodeTab === 'html') {
+        if (cssVars.length > 0) {
+          text += `<style>\n[data-sdl-plugin="tabs"] {\n${cssVars.join('\n')}\n}\n</style>\n\n`;
+        }
+        text += `<div\n  data-sdl-plugin="tabs"\n`;
+        attrs.forEach(a => { text += a + '\n'; });
+        text += `></div>`;
+      } else if (currentCodeTab === 'head') {
+        text += `<!-- SDL Tabs Pro: Add to Settings → Advanced → Code Injection → Header -->\n`;
+        text += `<link rel="stylesheet" href="${cssUrl}">\n\n`;
+        text += `<!-- SDL Tabs Pro: Add to Settings → Advanced → Code Injection → Footer -->\n`;
+        text += `<script src="${jsUrl}"><\/script>`;
+      } else if (currentCodeTab === 'css') {
+        if (cssVars.length === 0) {
+          text = '/* No CSS overrides needed */';
+        } else {
+          text = `/* SDL Tabs Pro — Custom CSS Overrides */\n/* Add to Settings → Advanced → Custom CSS */\n\n[data-sdl-plugin="tabs"] {\n${cssVars.join('\n')}\n}`;
+        }
+      }
+
+      navigator.clipboard.writeText(text).then(() => {
+        const btn = document.getElementById('copyBtn');
+        const orig = btn.innerHTML;
+        btn.classList.add('copied');
+        btn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> Copied!`;
+        setTimeout(() => { btn.classList.remove('copied'); btn.innerHTML = orig; }, 2000);
+      });
+    }
+
+    /* ─── INIT & BIND EVENTS ─── */
+    function bindAllEvents() {
+      const allInputs = document.querySelectorAll('.sidebar input, .sidebar select');
+      allInputs.forEach(el => {
+        el.addEventListener('change', () => { syncConditionalVisibility(); renderPreview(); renderCode(); });
+        if (el.type === 'text' || el.type === 'number' || el.type === 'url') {
+          el.addEventListener('input', () => { syncConditionalVisibility(); renderPreview(); renderCode(); });
+        }
+      });
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      bindAllEvents();
+      syncConditionalVisibility();
+      applyPreset('underline');
+    });
+  </script>
+</body>
+</html>
