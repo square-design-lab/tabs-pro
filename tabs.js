@@ -312,6 +312,37 @@
       window.dispatchEvent(new Event('mercury:load'));
     }
 
+    // Re-run Squarespace's JS-driven layout controllers (gallery grid/masonry,
+    // parallax, etc.) for a node and fire staggered resizes. Galleries compute
+    // their layout in JS and only measure correctly once the container is
+    // visible and sized — so this must run when a tab panel is actually on
+    // screen, not while it is hidden behind another tab.
+    function relayoutContent(scope) {
+      const nodes = resolveNodes(scope);
+      const run = () => {
+        const Y = window.Y;
+        const SQS = window.Squarespace;
+        if (SQS && Y) {
+          nodes.forEach(node => {
+            const yNode = Y.one(node);
+            if (!yNode) return;
+            try {
+              if (typeof SQS.initializeLayoutBlocks === 'function') SQS.initializeLayoutBlocks(Y, yNode);
+            } catch (e) {
+              /* no-op */
+            }
+          });
+        }
+        // Squarespace gallery (grid + masonry) and parallax controllers relayout
+        // on window resize; nudge them now that the panel is visible.
+        window.dispatchEvent(new Event('resize'));
+      };
+      // Several passes: immediately, after layout, and after the tab transition.
+      window.requestAnimationFrame(run);
+      window.setTimeout(run, 150);
+      window.setTimeout(run, 450);
+    }
+
     // Best-effort re-init of other SDL plugins on the page (no-op if none).
     function initializeAllPlugins() {
       /* intentionally minimal — fetched content is handled by reloadSquarespaceLifecycle */
@@ -325,6 +356,7 @@
       collectionData,
       reloadSquarespaceLifecycle,
       revealLazyContent,
+      relayoutContent,
       initializeAllPlugins,
     };
   })();
@@ -1418,13 +1450,16 @@
         this.activeTab.panel.focus({ preventScroll: true });
       }
 
-      // Reveal lazy content (gallery images, responsive images) the first time
-      // a panel becomes visible. Galleries that initialised while hidden may
-      // need a resize to lay out, so nudge them once the panel is on screen.
+      // The first time a panel becomes visible, reveal its lazy content
+      // (gallery images, responsive images) and re-run the Squarespace layout
+      // controllers while the panel is on screen. Galleries (grid gutters and
+      // masonry column layout) are computed in JS and only measure correctly
+      // once their container is visible — doing this on first show fixes
+      // collapsed gaps and masonry falling back to one item per row.
       if (this.activeTab.panel && !this.activeTab.panel.dataset.sdlRevealed) {
         this.activeTab.panel.dataset.sdlRevealed = 'true';
         sdl$.revealLazyContent(this.activeTab.panel);
-        requestAnimationFrame(() => window.dispatchEvent(new Event('resize')));
+        sdl$.relayoutContent(this.activeTab.panel);
       }
 
       sdl$?.emitEvent(`${sdlTabs.pluginTitle}:afterOpenTab`, { tabId, instance: this });
