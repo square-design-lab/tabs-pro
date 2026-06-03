@@ -312,11 +312,127 @@
       window.dispatchEvent(new Event('mercury:load'));
     }
 
-    // Re-run Squarespace's JS-driven layout controllers (gallery grid/masonry,
-    // parallax, etc.) for a node and fire staggered resizes. Galleries compute
-    // their layout in JS and only measure correctly once the container is
-    // visible and sized — so this must run when a tab panel is actually on
-    // screen, not while it is hidden behind another tab.
+    /* ---------------------------------------------------------------- *
+     *  Gallery layout reproduction
+     *  Squarespace 7.1 Gallery Sections (data-controller="GalleryGrid" /
+     *  "GalleryMasonry") are laid out by a bundled controller that runs once on
+     *  initial page load and cannot be re-invoked on dynamically injected
+     *  content (globalInit / initializePageContent do not bind it). So we
+     *  reproduce the controller's layout from each gallery's data-props:
+     *    • Grid   → CSS grid: repeat(columns, 1fr) + gutter gap.
+     *    • Masonry → JS column packing with absolute positioning.
+     *  Verified against the live site: grid gutter "50" → 2.5vw, masonry uses
+     *  each image's data-image-dimensions ratio.
+     * ---------------------------------------------------------------- */
+    function galleryAspectWH(name) {
+      // Returns width/height for the named gallery aspect ratio, or null for
+      // "original" (use each image's natural ratio).
+      switch (name) {
+        case 'square': return 1;
+        case 'portrait': return 2 / 3;
+        case 'standard': return 4 / 3;
+        case 'widescreen': return 16 / 9;
+        default: return null;
+      }
+    }
+
+    function galleryItemRatioHW(item) {
+      // height / width of the item's image, from data-image-dimensions (exact)
+      // or the natural size once loaded.
+      const img = item.querySelector('img');
+      const dims = img && img.getAttribute('data-image-dimensions');
+      if (dims) {
+        const parts = dims.split('x').map(Number);
+        if (parts[0] && parts[1]) return parts[1] / parts[0];
+      }
+      if (img && img.naturalWidth) return img.naturalHeight / img.naturalWidth;
+      return 1;
+    }
+
+    function readGalleryProps(el) {
+      let props = {};
+      try {
+        props = JSON.parse(el.dataset.props || '{}');
+      } catch (e) {
+        /* fall back to individual data-* attributes */
+      }
+      return {
+        numColumns: Number(props.numColumns) || Number(el.dataset.columns) || 1,
+        gutter: props.gutter != null ? Number(props.gutter) : Number(el.dataset.gutter) || 0,
+        aspectRatio: props.aspectRatio || el.dataset.aspectRatio || 'original',
+      };
+    }
+
+    function responsiveColumns(cols, width) {
+      if (width < 480) return 1;
+      if (width < 767) return Math.min(cols, 2);
+      return cols;
+    }
+
+    function layoutGalleryGrid(grid) {
+      const wrapper = grid.querySelector('.gallery-grid-wrapper');
+      if (!wrapper) return;
+      const { numColumns, gutter, aspectRatio } = readGalleryProps(grid);
+      const cols = responsiveColumns(numColumns, wrapper.clientWidth || window.innerWidth);
+      const gapVw = gutter / 20; // controller maps gutter 50 → 2.5vw
+      wrapper.style.gridTemplateColumns = 'repeat(' + cols + ', 1fr)';
+      wrapper.style.columnGap = gapVw + 'vw';
+      wrapper.style.rowGap = gapVw + 'vw';
+      const fixedAr = galleryAspectWH(aspectRatio);
+      grid.querySelectorAll('.gallery-grid-item').forEach(item => {
+        item.style.position = 'relative';
+        const arWH = fixedAr != null ? fixedAr : 1 / galleryItemRatioHW(item);
+        item.style.aspectRatio = String(arWH);
+      });
+    }
+
+    function layoutGalleryMasonry(gallery) {
+      const wrapper = gallery.querySelector('.gallery-masonry-wrapper');
+      if (!wrapper) return;
+      const width = wrapper.clientWidth;
+      if (!width) return; // not visible / no width yet — try again later
+      const { numColumns, gutter } = readGalleryProps(gallery);
+      const cols = responsiveColumns(numColumns, width);
+      const gutterPx = ((gutter / 20) / 100) * window.innerWidth; // gutter vw → px
+      const colWidth = (width - gutterPx * (cols - 1)) / cols;
+      const colHeights = new Array(cols).fill(0);
+      wrapper.style.position = 'relative';
+      gallery.querySelectorAll('.gallery-masonry-item').forEach(item => {
+        const itemHeight = colWidth * galleryItemRatioHW(item);
+        let min = 0;
+        for (let i = 1; i < cols; i++) {
+          if (colHeights[i] < colHeights[min]) min = i;
+        }
+        item.style.position = 'absolute';
+        item.style.margin = '0';
+        item.style.width = colWidth + 'px';
+        item.style.left = min * (colWidth + gutterPx) + 'px';
+        item.style.top = colHeights[min] + 'px';
+        colHeights[min] += itemHeight + gutterPx;
+      });
+      const tallest = colHeights.reduce((a, b) => Math.max(a, b), 0);
+      wrapper.style.height = Math.max(0, tallest - gutterPx) + 'px';
+    }
+
+    function layoutGalleries(scope) {
+      resolveNodes(scope).forEach(node => {
+        try {
+          node.querySelectorAll('.gallery-grid').forEach(layoutGalleryGrid);
+        } catch (e) {
+          /* no-op */
+        }
+        try {
+          node.querySelectorAll('.gallery-masonry').forEach(layoutGalleryMasonry);
+        } catch (e) {
+          /* no-op */
+        }
+      });
+    }
+
+    // Re-run layout for injected content (gallery grid/masonry) and fire
+    // staggered resizes. Galleries compute their layout from the container
+    // width and only measure correctly once the tab panel is actually visible —
+    // so this must run when a panel is on screen, not while it is hidden.
     function relayoutContent(scope) {
       const nodes = resolveNodes(scope);
       const run = () => {
@@ -333,8 +449,9 @@
             }
           });
         }
-        // Squarespace gallery (grid + masonry) and parallax controllers relayout
-        // on window resize; nudge them now that the panel is visible.
+        // Reproduce 7.1 gallery section layout (controller can't be re-invoked).
+        layoutGalleries(nodes);
+        // Other resize-driven controllers (parallax, video) recompute here too.
         window.dispatchEvent(new Event('resize'));
       };
       // Several passes: immediately, after layout, and after the tab transition.
@@ -357,6 +474,7 @@
       reloadSquarespaceLifecycle,
       revealLazyContent,
       relayoutContent,
+      layoutGalleries,
       initializeAllPlugins,
     };
   })();
@@ -1162,6 +1280,9 @@
         this.setTabHeights();
         this.scrollTabIntoView();
         this.handleTabsNavigationIndicatorsDisplay();
+        // Masonry galleries position items by pixel and must be recomputed when
+        // the viewport (and therefore the column width) changes.
+        if (this.activeTab && this.activeTab.panel) sdl$.layoutGalleries(this.activeTab.panel);
       }, 250);
       window.addEventListener('resize', throttledResize);
     }
