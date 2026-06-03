@@ -545,8 +545,41 @@
       cursor: pointer;
       color: #333;
     }
-    .mock-tabs-wrapper[data-nav="select"] .mock-select-btn svg { width: 14px; height: 14px; opacity: 0.5; }
+    .mock-tabs-wrapper[data-nav="select"] .mock-select-btn svg { width: 14px; height: 14px; opacity: 0.5; transition: transform 0.2s ease; }
+    .mock-tabs-wrapper[data-nav="select"] .mock-select-wrap.open .mock-select-btn svg { transform: rotate(180deg); }
     .mock-tabs-wrapper[data-nav="select"] .mock-tabs-nav-wrap { display: none; }
+    .mock-tabs-wrapper[data-nav="select"] .mock-select-menu {
+      position: absolute;
+      top: calc(100% + 4px);
+      left: 0;
+      right: 0;
+      z-index: 30;
+      background: #fff;
+      border: 1px solid rgba(0,0,0,0.14);
+      border-radius: 6px;
+      box-shadow: 0 8px 28px rgba(0,0,0,0.14);
+      padding: 4px;
+      max-height: 260px;
+      overflow-y: auto;
+      display: none;
+    }
+    .mock-tabs-wrapper[data-nav="select"] .mock-select-wrap.open .mock-select-menu { display: block; }
+    .mock-tabs-wrapper[data-nav="select"] .mock-select-item {
+      display: block;
+      width: 100%;
+      text-align: left;
+      padding: 8px 10px;
+      border: none;
+      background: transparent;
+      font-family: 'Inter', sans-serif;
+      font-size: var(--mock-font-size);
+      color: #333;
+      cursor: pointer;
+      border-radius: 4px;
+      transition: background 0.12s ease;
+    }
+    .mock-tabs-wrapper[data-nav="select"] .mock-select-item:hover { background: #f2f2f2; }
+    .mock-tabs-wrapper[data-nav="select"] .mock-select-item.active { background: #f4f4f5; color: #111; font-weight: 600; }
 
     /* accordion layout */
     .mock-tabs-wrapper[data-nav="accordion"] .mock-tabs-nav-wrap { display: none; }
@@ -1241,6 +1274,7 @@
     let currentCodeTab = 'html';
     let activeTabIndex = 0;
     let currentPreset = 'underline';
+    let selectOpen = false;
 
     /* ─── PRESET DEFINITIONS ─── */
     const PRESETS = {
@@ -1414,6 +1448,7 @@
       const wrapper = document.getElementById('mockWrapper');
       const navType = getNavType();
       wrapper.setAttribute('data-nav', navType);
+      if (navType !== 'select') selectOpen = false;
 
       const btnBg = getVal('btnBgTransparent') ? 'transparent' : getVal('btnBg');
       const btnColor = getVal('btnColor');
@@ -1472,7 +1507,13 @@
       wrapper.style.setProperty('--mock-vert-width', vertWidth + 'px');
       wrapper.style.setProperty('--mock-justify', navJustify);
       wrapper.style.setProperty('--mock-indicator-color', indicatorOn ? indicatorColor : 'transparent');
-      wrapper.style.setProperty('--mock-indicator-track-bg', indicatorOn ? indicatorTrackColor : 'transparent');
+      // The full-length "track" rail is only visible for the Track + Thumb style.
+      // (A color <input> can't store "transparent", so never paint the rail for
+      // the other styles — otherwise it fills the nav with the swatch colour.)
+      const showTrackRail = indicatorOn && indicatorStyle === 'track';
+      wrapper.style.setProperty('--mock-indicator-track-bg', showTrackRail ? indicatorTrackColor : 'transparent');
+      // Rail thickness (only matters when the rail is visible).
+      wrapper.style.setProperty('--mock-indicator-size', (parseInt(indicatorTrackSize, 10) || 2) + 'px');
 
       if (navType === 'accordion') {
         renderAccordion(wrapper, tabImages);
@@ -1518,11 +1559,15 @@
     function renderSelect(wrapper, tabImages) {
       const activeLabel = MOCK_TABS[activeTabIndex].label;
       wrapper.innerHTML = `
-        <div class="mock-select-wrap">
-          <button class="mock-select-btn">
+        <div class="mock-select-wrap${selectOpen ? ' open' : ''}">
+          <button class="mock-select-btn" onclick="toggleSelectMenu(event)">
             <span>${activeLabel}</span>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
           </button>
+          <div class="mock-select-menu">
+            ${MOCK_TABS.map((t, i) => `
+              <button class="mock-select-item${i === activeTabIndex ? ' active' : ''}" onclick="selectOption(event, ${i})">${t.label}</button>`).join('')}
+          </div>
         </div>
         <div class="mock-tabs-nav-wrap"></div>
         <div class="mock-content-area" style="padding-top:0">
@@ -1536,6 +1581,18 @@
               </div>
             </div>`).join('')}
         </div>`;
+    }
+
+    function toggleSelectMenu(e) {
+      e.stopPropagation();
+      selectOpen = !selectOpen;
+      renderPreview();
+    }
+
+    function selectOption(e, idx) {
+      e.stopPropagation();
+      selectOpen = false;
+      switchTab(idx);
     }
 
     function renderAccordion(wrapper, tabImages) {
@@ -1703,10 +1760,18 @@
       if (!indicatorOn) {
         vars.push(`  --tab-indicator-display: none;`);
       } else {
+        const indicatorStyle = getVal('indicatorStyle');
         const iColor = getVal('indicatorColor');
         vars.push(`  --active-indicator-color: ${iColor};`);
-        const iTrack = getVal('indicatorTrackColor');
-        if (iTrack !== '#e5e5e5' && iTrack !== 'transparent') vars.push(`  --tab-indicator-track-background: ${iTrack};`);
+        // The full-length track rail only applies to the Track + Thumb style.
+        // (A color <input> can't hold "transparent", so for the other styles it
+        // reads as #000000 — never emit it there or users get a black rail.)
+        if (indicatorStyle === 'track') {
+          const iTrack = getVal('indicatorTrackColor');
+          if (iTrack !== '#e5e5e5' && iTrack !== 'transparent') {
+            vars.push(`  --tab-indicator-track-background: ${iTrack};`);
+          }
+        }
         const iSize = getVal('indicatorTrackSize');
         vars.push(`  --tab-indicator-track-size: ${iSize}px;`);
         const iRadius = getVal('indicatorRadius');
@@ -1840,6 +1905,14 @@
         }
       });
     }
+
+    // Close the select-nav dropdown when clicking anywhere outside it.
+    document.addEventListener('click', (e) => {
+      if (selectOpen && !e.target.closest('.mock-select-wrap')) {
+        selectOpen = false;
+        renderPreview();
+      }
+    });
 
     document.addEventListener('DOMContentLoaded', () => {
       bindAllEvents();
