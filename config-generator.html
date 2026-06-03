@@ -1642,7 +1642,8 @@
           indicator.style.cssText = `top:${activeBtn.offsetTop}px; right:0; height:${activeBtn.offsetHeight}px; width:${trackSize}px; border-radius:${radius}px 0 0 ${radius}px;`;
         }
       } else if (style === 'background' || style === 'pill') {
-        indicator.style.cssText = `left:${activeBtn.offsetLeft}px; top:${activeBtn.offsetTop}px; width:${activeBtn.offsetWidth}px; height:${activeBtn.offsetHeight}px; border-radius:${radius}px; z-index:0; opacity:1;`;
+        const r = style === 'pill' ? 9999 : radius;
+        indicator.style.cssText = `left:${activeBtn.offsetLeft}px; top:${activeBtn.offsetTop}px; width:${activeBtn.offsetWidth}px; height:${activeBtn.offsetHeight}px; border-radius:${r}px; z-index:0; opacity:1;`;
       } else if (style === 'dot') {
         const dotLeft = activeBtn.offsetLeft + activeBtn.offsetWidth / 2 - 3;
         indicator.style.cssText = `left:${dotLeft}px; bottom:0; width:6px; height:6px; border-radius:50%;`;
@@ -1761,21 +1762,19 @@
         vars.push(`  --tab-indicator-display: none;`);
       } else {
         const indicatorStyle = getVal('indicatorStyle');
-        const iColor = getVal('indicatorColor');
-        vars.push(`  --active-indicator-color: ${iColor};`);
-        // The full-length track rail only applies to the Track + Thumb style.
-        // (A color <input> can't hold "transparent", so for the other styles it
-        // reads as #000000 — never emit it there or users get a black rail.)
+        vars.push(`  --active-indicator-color: ${getVal('indicatorColor')};`);
+        // Corner radius: a dot is always round; every other style uses the
+        // configured radius (a large value yields the "pill" look). Matches
+        // the preview, which uses the same radius for all non-dot styles.
+        const iRadius = indicatorStyle === 'dot' ? '50%'
+          : indicatorStyle === 'pill' ? '9999px'
+          : (getVal('indicatorRadius') + 'px');
+        vars.push(`  --active-indicator-border-radius: ${iRadius};`);
+        // The full-length rail is only painted for the Track + Thumb style.
         if (indicatorStyle === 'track') {
-          const iTrack = getVal('indicatorTrackColor');
-          if (iTrack !== '#e5e5e5' && iTrack !== 'transparent') {
-            vars.push(`  --tab-indicator-track-background: ${iTrack};`);
-          }
+          vars.push(`  --tab-indicator-track-background: ${getVal('indicatorTrackColor')};`);
+          vars.push(`  --tab-indicator-track-size: ${getVal('indicatorTrackSize')}px;`);
         }
-        const iSize = getVal('indicatorTrackSize');
-        vars.push(`  --tab-indicator-track-size: ${iSize}px;`);
-        const iRadius = getVal('indicatorRadius');
-        if (iRadius !== '4') vars.push(`  --active-indicator-border-radius: ${iRadius}px;`);
       }
 
       const contentPadding = getVal('contentPaddingTop');
@@ -1798,6 +1797,67 @@
       return vars;
     }
 
+    // Some indicator styles need geometry that differs by nav orientation
+    // (a bottom bar in horizontal vs a side bar in vertical). The plugin sizes
+    // the indicator from the active button's runtime geometry vars, so we just
+    // override the right dimensions per [data-navigation-type]. Returns an
+    // array of full CSS rule blocks (plain text) to append after the main rule.
+    function buildIndicatorBlocks() {
+      if (!getVal('indicatorEnabled')) return [];
+      const style = getVal('indicatorStyle');
+      const P = '[data-sdl-plugin="tabs"]';
+      const blocks = [];
+
+      // background & pill fill the whole active button — no geometry override.
+      if (style === 'underline' || style === 'track') {
+        const s = parseInt(getVal('indicatorTrackSize'), 10) || 3;
+        blocks.push(
+`${P}[data-navigation-type="horizontal"] {
+  --active-indicator-height: ${s}px;
+  --active-indicator-top: calc(var(--tab-button-active-top) + var(--tab-button-active-height) - ${s}px);
+}`);
+        blocks.push(
+`${P}[data-navigation-type="vertical"] {
+  --active-indicator-width: ${s}px;
+  --active-indicator-left: calc(var(--tab-button-active-left) + var(--tab-button-active-width) - ${s}px);
+}`);
+      } else if (style === 'dot') {
+        const d = Math.max(parseInt(getVal('indicatorTrackSize'), 10) || 6, 6);
+        blocks.push(
+`${P}[data-navigation-type="horizontal"] {
+  --active-indicator-width: ${d}px;
+  --active-indicator-height: ${d}px;
+  --active-indicator-left: calc(var(--tab-button-active-left) + (var(--tab-button-active-width) - ${d}px) / 2);
+  --active-indicator-top: calc(var(--tab-button-active-top) + var(--tab-button-active-height) - ${d}px);
+}`);
+        blocks.push(
+`${P}[data-navigation-type="vertical"] {
+  --active-indicator-width: ${d}px;
+  --active-indicator-height: ${d}px;
+  --active-indicator-top: calc(var(--tab-button-active-top) + (var(--tab-button-active-height) - ${d}px) / 2);
+  --active-indicator-left: calc(var(--tab-button-active-left) + var(--tab-button-active-width) - ${d}px);
+}`);
+      }
+      return blocks;
+    }
+
+    // Render a plain CSS rule block to syntax-highlighted HTML.
+    function cssBlockToHtml(block) {
+      return block.split('\n').map(line => {
+        const t = line.trim();
+        if (!t) return '';
+        if (t.endsWith('{')) return `<span class="hl-attr">${escHtml(t.slice(0, -1).trim())}</span> {`;
+        if (t === '}') return '}';
+        const ci = t.indexOf(':');
+        if (ci > -1) {
+          const prop = t.slice(0, ci).trim();
+          const val = t.slice(ci + 1).replace(/;$/, '').trim();
+          return `  <span class="hl-prop">${escHtml(prop)}</span>: <span class="hl-val">${escHtml(val)}</span>`;
+        }
+        return escHtml(line);
+      }).join('\n');
+    }
+
     function renderCode() {
       const output = document.getElementById('codeOutput');
       const cssUrl = getVal('cssUrl');
@@ -1806,16 +1866,20 @@
       const cssVars = buildCssVars();
 
       if (currentCodeTab === 'html') {
-        const hasCssVars = cssVars.length > 0;
+        const indicatorBlocks = buildIndicatorBlocks();
+        const hasCss = cssVars.length > 0 || indicatorBlocks.length > 0;
         let code = '';
-        if (hasCssVars) {
+        if (hasCss) {
           code += `<span class="hl-tag">&lt;style&gt;</span>\n`;
-          code += `<span class="hl-attr">[data-sdl-plugin="tabs"]</span> {\n`;
-          cssVars.forEach(v => {
-            const [prop, val] = v.split(':');
-            code += `  <span class="hl-prop">${prop.trim()}</span>: <span class="hl-val">${val?.trim()}</span>\n`;
-          });
-          code += `}\n`;
+          if (cssVars.length) {
+            code += `<span class="hl-attr">[data-sdl-plugin="tabs"]</span> {\n`;
+            cssVars.forEach(v => {
+              const [prop, val] = v.split(':');
+              code += `  <span class="hl-prop">${prop.trim()}</span>: <span class="hl-val">${val?.trim()}</span>\n`;
+            });
+            code += `}\n`;
+          }
+          indicatorBlocks.forEach(b => { code += cssBlockToHtml(b) + '\n'; });
           code += `<span class="hl-tag">&lt;/style&gt;</span>\n\n`;
         }
         code += `<span class="hl-tag">&lt;div</span>\n`;
@@ -1837,17 +1901,22 @@
         output.innerHTML = code;
 
       } else if (currentCodeTab === 'css') {
-        if (cssVars.length === 0) {
+        const indicatorBlocks = buildIndicatorBlocks();
+        if (cssVars.length === 0 && indicatorBlocks.length === 0) {
           output.innerHTML = `<span class="hl-cmt">/* No CSS overrides needed — all settings are using defaults. */</span>`;
         } else {
           let code = `<span class="hl-cmt">/* SDL Tabs Pro — Custom CSS Overrides */</span>\n`;
           code += `<span class="hl-cmt">/* Add to Settings → Advanced → Custom CSS */</span>\n\n`;
-          code += `<span class="hl-attr">[data-sdl-plugin="tabs"]</span> {\n`;
-          cssVars.forEach(v => {
-            const [prop, val] = v.split(':');
-            code += `  <span class="hl-prop">${prop.trim()}</span>: <span class="hl-val">${val?.trim()}</span>\n`;
-          });
-          code += `}`;
+          if (cssVars.length) {
+            code += `<span class="hl-attr">[data-sdl-plugin="tabs"]</span> {\n`;
+            cssVars.forEach(v => {
+              const [prop, val] = v.split(':');
+              code += `  <span class="hl-prop">${prop.trim()}</span>: <span class="hl-val">${val?.trim()}</span>\n`;
+            });
+            code += `}`;
+            if (indicatorBlocks.length) code += `\n\n`;
+          }
+          code += indicatorBlocks.map(cssBlockToHtml).join('\n\n');
           output.innerHTML = code;
         }
       }
@@ -1867,8 +1936,12 @@
       let text = '';
 
       if (currentCodeTab === 'html') {
-        if (cssVars.length > 0) {
-          text += `<style>\n[data-sdl-plugin="tabs"] {\n${cssVars.join('\n')}\n}\n</style>\n\n`;
+        const indicatorBlocks = buildIndicatorBlocks();
+        if (cssVars.length > 0 || indicatorBlocks.length > 0) {
+          let css = '';
+          if (cssVars.length) css += `[data-sdl-plugin="tabs"] {\n${cssVars.join('\n')}\n}\n`;
+          if (indicatorBlocks.length) css += indicatorBlocks.join('\n') + '\n';
+          text += `<style>\n${css}</style>\n\n`;
         }
         text += `<div\n  data-sdl-plugin="tabs"\n`;
         attrs.forEach(a => { text += a + '\n'; });
@@ -1879,10 +1952,16 @@
         text += `<!-- SDL Tabs Pro: Add to Settings → Advanced → Code Injection → Footer -->\n`;
         text += `<script src="${jsUrl}"><\/script>`;
       } else if (currentCodeTab === 'css') {
-        if (cssVars.length === 0) {
+        const indicatorBlocks = buildIndicatorBlocks();
+        if (cssVars.length === 0 && indicatorBlocks.length === 0) {
           text = '/* No CSS overrides needed */';
         } else {
-          text = `/* SDL Tabs Pro — Custom CSS Overrides */\n/* Add to Settings → Advanced → Custom CSS */\n\n[data-sdl-plugin="tabs"] {\n${cssVars.join('\n')}\n}`;
+          text = `/* SDL Tabs Pro — Custom CSS Overrides */\n/* Add to Settings → Advanced → Custom CSS */\n\n`;
+          if (cssVars.length) {
+            text += `[data-sdl-plugin="tabs"] {\n${cssVars.join('\n')}\n}`;
+            if (indicatorBlocks.length) text += '\n\n';
+          }
+          text += indicatorBlocks.join('\n\n');
         }
       }
 
