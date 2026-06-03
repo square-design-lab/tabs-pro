@@ -3,12 +3,177 @@
  * Squarespace Tabs Plugin
  * © 2026 SDL. All rights reserved.
  * Licensed via LemonSqueezy — one license per site.
- * Requires: SDL Core Library (sdl$)
+ * Self-contained: no external helper library required.
  *
  * Documentation: https://sdlplugins.com/docs/tabs-pro
  */
 (function () {
   'use strict';
+
+  /* ------------------------------------------------------------------ *
+   *  Self-contained helper library (local `sdl$`)
+   *  Replaces the external SDL Core Library so the plugin runs standalone.
+   * ------------------------------------------------------------------ */
+  const sdl$ = (function () {
+    function isPlainObject(value) {
+      return (
+        value &&
+        typeof value === 'object' &&
+        !Array.isArray(value) &&
+        Object.prototype.toString.call(value) === '[object Object]'
+      );
+    }
+
+    function deepMerge(target, ...sources) {
+      sources.forEach(source => {
+        if (!isPlainObject(source)) return;
+        Object.keys(source).forEach(key => {
+          const sourceVal = source[key];
+          if (isPlainObject(sourceVal)) {
+            if (!isPlainObject(target[key])) target[key] = {};
+            deepMerge(target[key], sourceVal);
+          } else if (sourceVal !== undefined) {
+            target[key] = sourceVal;
+          }
+        });
+      });
+      return target;
+    }
+
+    // Convert a data-* string value into a real JS type (bool / number / JSON).
+    function parseAttr(value) {
+      if (typeof value !== 'string') return value;
+      const trimmed = value.trim();
+      if (trimmed === 'true') return true;
+      if (trimmed === 'false') return false;
+      if (trimmed === 'null') return null;
+      if (trimmed !== '' && !isNaN(Number(trimmed)) && /^-?\d*\.?\d+$/.test(trimmed)) {
+        return Number(trimmed);
+      }
+      if (
+        (trimmed.startsWith('{') && trimmed.endsWith('}')) ||
+        (trimmed.startsWith('[') && trimmed.endsWith(']'))
+      ) {
+        try {
+          return JSON.parse(trimmed);
+        } catch (e) {
+          return value;
+        }
+      }
+      return value;
+    }
+
+    function emitEvent(name, detail) {
+      try {
+        window.dispatchEvent(new CustomEvent(name, { detail: detail || null, bubbles: true }));
+      } catch (e) {
+        /* no-op */
+      }
+    }
+
+    // Leading + trailing throttle.
+    function throttle(fn, wait) {
+      let last = 0;
+      let timer = null;
+      return function (...args) {
+        const now = Date.now();
+        const remaining = wait - (now - last);
+        if (remaining <= 0) {
+          if (timer) {
+            clearTimeout(timer);
+            timer = null;
+          }
+          last = now;
+          fn.apply(this, args);
+        } else if (!timer) {
+          timer = setTimeout(() => {
+            last = Date.now();
+            timer = null;
+            fn.apply(this, args);
+          }, remaining);
+        }
+      };
+    }
+
+    // Fetch a Squarespace collection (e.g. Portfolio) as JSON.
+    // Portfolio items expose `body` (containing #sections), `title`, `assetUrl`.
+    async function collectionData(source, options) {
+      const opts = options || {};
+      let path = source;
+
+      // Weglot multi-language path rewriting (array or object map).
+      if (opts.weglotPaths && typeof opts.weglotPaths === 'object') {
+        const lang =
+          document.documentElement.getAttribute('lang') ||
+          (window.Weglot && window.Weglot.getCurrentLang && window.Weglot.getCurrentLang());
+        if (lang && !Array.isArray(opts.weglotPaths) && opts.weglotPaths[lang]) {
+          path = opts.weglotPaths[lang];
+        } else if (lang && Array.isArray(opts.weglotPaths) && opts.weglotPaths.includes('/' + lang)) {
+          path = '/' + lang + path;
+        }
+      }
+
+      if (!/^https?:\/\//.test(path) && path[0] !== '/') path = '/' + path;
+      const url = path + (path.indexOf('?') === -1 ? '?format=json' : '&format=json');
+
+      const response = await fetch(url, { credentials: 'same-origin' });
+      if (!response.ok) {
+        throw new Error('sdlTabs: failed to fetch collection ' + path + ' (HTTP ' + response.status + ')');
+      }
+      const data = await response.json();
+      const items = Array.isArray(data.items) ? data.items : [];
+
+      let type = (data.collection && data.collection.typeName) || 'collection';
+      // Robust portfolio detection: portfolio items carry a full page body with #sections.
+      if (type !== 'portfolio' && items.some(it => typeof it.body === 'string' && it.body.indexOf('id="sections"') !== -1)) {
+        type = 'portfolio';
+      }
+
+      return { items, type };
+    }
+
+    // Re-run Squarespace's block / embed / commerce initialisation after the
+    // tabs DOM has been (re)built and fetched content injected. Best-effort.
+    async function reloadSquarespaceLifecycle() {
+      try {
+        const Y = window.Y;
+        const SQS = window.Squarespace;
+        if (SQS && Y) {
+          const root = Y.one(document.body);
+          if (typeof SQS.globalInit === 'function') SQS.globalInit(Y);
+          if (typeof SQS.initializeLayoutBlocks === 'function') SQS.initializeLayoutBlocks(Y, root);
+          if (typeof SQS.initializeCommerce === 'function') SQS.initializeCommerce(Y, root);
+          if (typeof SQS.afterBodyLoad === 'function') SQS.afterBodyLoad(Y);
+        }
+      } catch (e) {
+        /* best-effort — never break the page */
+      }
+      try {
+        if (window.ImageLoader && typeof window.ImageLoader.load === 'function') {
+          document.querySelectorAll('img[data-src]').forEach(img => window.ImageLoader.load(img, { load: true }));
+        }
+      } catch (e) {
+        /* no-op */
+      }
+      window.dispatchEvent(new Event('resize'));
+      window.dispatchEvent(new Event('mercury:load'));
+    }
+
+    // Best-effort re-init of other SDL plugins on the page (no-op if none).
+    function initializeAllPlugins() {
+      /* intentionally minimal — fetched content is handled by reloadSquarespaceLifecycle */
+    }
+
+    return {
+      deepMerge,
+      parseAttr,
+      emitEvent,
+      throttle,
+      collectionData,
+      reloadSquarespaceLifecycle,
+      initializeAllPlugins,
+    };
+  })();
 
   class sdlTabs {
     static pluginTitle = 'sdlTabs';
@@ -108,7 +273,7 @@
       this.tabs = [];
       this._navigaitonType = '';
       this.hasLoaded = false;
-      this.tweaks = Static.SQUARESPACE_CONTEXT.tweakJSON;
+      this.tweaks = (window.Static && window.Static.SQUARESPACE_CONTEXT && window.Static.SQUARESPACE_CONTEXT.tweakJSON) || {};
       this.hasAccordionInBreakpoints = Object.values(this.settings.breakpoints).some(
         bp => bp.navigationType === 'accordion'
       );
@@ -1329,7 +1494,14 @@
       deconstruct: () => sdlTabs.deconstruct(),
     };
 
-    window.sdlTabs.init();
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', initTabs);
+    } else {
+      initTabs();
+    }
+    // Re-init on Squarespace AJAX page transitions (mercury). The constructor
+    // guards against double-initialisation via el.dataset.loadingState.
+    window.addEventListener('mercury:load', initTabs);
   })();
 
 })();
