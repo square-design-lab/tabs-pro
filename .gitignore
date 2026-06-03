@@ -1,0 +1,4 @@
+# Source/dev files — never publish to repo
+plugin.js
+plugin.css
+sdlTabs-plugin-documentation.md
