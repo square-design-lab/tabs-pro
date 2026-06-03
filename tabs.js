@@ -246,15 +246,36 @@
           /* no-op */
         }
 
-        // 3. Gallery grid items — hidden by `.gallery-grid-item:not([data-show])`.
-        //    The staggered reveal observer never attached, so mark them shown.
+        // 3. Gallery items — every Squarespace gallery design hides its items
+        //    via `.gallery-<design>-item:not([data-show])` until a staggered
+        //    reveal observer runs. That observer never attached to injected
+        //    content, so mark every gallery item (grid, masonry, strips,
+        //    stacked, reel, slideshow, …) as shown. The wildcard catches any
+        //    current or future "gallery-*-item" variant.
         try {
-          node.querySelectorAll('.gallery-grid-item').forEach(item => item.setAttribute('data-show', ''));
+          node
+            .querySelectorAll(
+              '.gallery-grid-item, .gallery-masonry-item, .gallery-strips-item, ' +
+                '.gallery-stacked-item, .gallery-reel-item, .gallery-slideshow-item, ' +
+                '.gallery-fullscreen-slideshow-item, .gallery-square-item, ' +
+                '[class*="gallery-"][class*="-item"]'
+            )
+            .forEach(item => item.setAttribute('data-show', ''));
         } catch (e) {
           /* no-op */
         }
 
-        // 4. Other lazy reveal patterns gated by a "loaded" data flag.
+        // 4. Masonry galleries position items with JS; nudge a relayout once the
+        //    items are revealed so they don't overlap.
+        try {
+          if (node.querySelector('.gallery-masonry, .gallery-masonry-item')) {
+            window.requestAnimationFrame(() => window.dispatchEvent(new Event('resize')));
+          }
+        } catch (e) {
+          /* no-op */
+        }
+
+        // 5. Other lazy reveal patterns gated by a "loaded" data flag.
         try {
           node.querySelectorAll('[data-loader-loaded="false"]').forEach(el => el.setAttribute('data-loader-loaded', 'true'));
         } catch (e) {

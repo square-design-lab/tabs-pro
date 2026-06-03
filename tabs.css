@@ -688,11 +688,17 @@ body.sqs-edit-mode-active .sqs-block.sqs-block-code:has([data-sdl-plugin="tabs"]
    (opacity:0) waiting for a "loaded"/"data-show" flag that never arrives.
    The plugin JS sets those flags; these rules are a CSS backstop in case the
    controller timing is missed, guaranteeing the content is visible. */
-.tab-content .gallery-grid-item .gallery-grid-item-wrapper,
 .tab-content .gallery-grid-item:not([data-show]) .gallery-grid-item-wrapper,
+.tab-content .gallery-masonry-item:not([data-show]) .gallery-masonry-item-wrapper,
+.tab-content .gallery-strips-item:not([data-show]) .gallery-strips-item-wrapper,
+.tab-content .gallery-stacked-item:not([data-show]) .gallery-stacked-item-wrapper,
+.tab-content [class*="gallery-"][class*="-item"]:not([data-show]) > [class*="-item-wrapper"],
+.tab-content .gallery-grid-item .gallery-grid-item-wrapper,
+.tab-content .gallery-masonry-item .gallery-masonry-item-wrapper,
 .tab-content .gallery-fullscreen-slideshow-item,
 .tab-content .gallery-reel-item {
   opacity: 1 !important;
+  animation-name: none !important;
 }
 .tab-content .sqs-gallery-design-grid .slide,
 .tab-content .sqs-gallery-block-grid .slide {
