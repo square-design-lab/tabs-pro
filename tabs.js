@@ -128,14 +128,55 @@
     }
 
     // Fetch a single item page and return its sections markup (best-effort).
+    // Fetch a page's lean content fragment via Squarespace's ?format=html
+    // endpoint (much smaller than the full page — no header/footer/site bundle),
+    // so injected content paints faster.
+    function fetchPageHtmlFresh(url) {
+      const u = url + (url.indexOf('?') === -1 ? '?format=html' : '&format=html');
+      return fetch(u, { credentials: 'same-origin', cache: 'no-store' }).then(res => {
+        if (!res.ok) throw new Error('sdlTabs: failed to fetch ' + url + ' (HTTP ' + res.status + ')');
+        return res.text();
+      });
+    }
+
+    // Stale-while-revalidate localStorage cache: serve cached HTML instantly
+    // (so repeat visits show tab content with no network wait) and refresh in
+    // the background once the entry passes `expiresMinutes`.
+    async function fetchPageHtmlCached(url, expiresMinutes) {
+      const exp = typeof expiresMinutes === 'number' ? expiresMinutes : 10;
+      const key = 'sdlTabs-cache:' + url;
+      const keyExp = key + ':exp';
+      const writeCache = html => {
+        try {
+          localStorage.setItem(key, html);
+          localStorage.setItem(keyExp, String(Date.now() + exp * 60000));
+        } catch (e) {
+          /* quota / disabled storage — ignore */
+        }
+      };
+      const isExpired = () => {
+        let t = 0;
+        try {
+          t = parseInt(localStorage.getItem(keyExp) || '0', 10);
+        } catch (e) {}
+        return !t || t <= Date.now();
+      };
+      let cached = null;
+      try {
+        cached = localStorage.getItem(key);
+      } catch (e) {}
+      if (cached) {
+        if (isExpired()) fetchPageHtmlFresh(url).then(writeCache).catch(() => {});
+        return cached;
+      }
+      const html = await fetchPageHtmlFresh(url);
+      writeCache(html);
+      return html;
+    }
+
     async function fetchItemSections(fullUrl) {
       try {
-        const res = await fetch(fullUrl, { credentials: 'same-origin', headers: { Accept: 'text/html' } });
-        if (!res.ok) {
-          console.error('sdlTabs: failed to fetch item page ' + fullUrl + ' (HTTP ' + res.status + ')');
-          return '';
-        }
-        const html = await res.text();
+        const html = await fetchPageHtmlCached(fullUrl);
         return extractSectionsFromPageHtml(html);
       } catch (e) {
         console.error('sdlTabs: error fetching item page ' + fullUrl, e);
@@ -213,17 +254,22 @@
     // works even for tab panels that are currently hidden.
     function revealLazyContent(scope) {
       resolveNodes(scope).forEach(node => {
-        // 1. Responsive <img> (content images, gallery images, logos, etc.)
+        // 1. Responsive <img> (content images, gallery images, logos, etc.).
+        //    Squarespace lazy-loads these via data-src + ImageLoader; also catch
+        //    images that have no resolved src yet.
         try {
-          node.querySelectorAll('img[data-src]').forEach(img => {
-            if (window.ImageLoader && typeof window.ImageLoader.load === 'function') {
+          const loader = window.ImageLoader || (window.Squarespace && window.Squarespace.ImageLoader);
+          node.querySelectorAll('img[data-src], img:not([src])').forEach(img => {
+            if (loader && typeof loader.load === 'function') {
               try {
-                window.ImageLoader.load(img, { load: true });
+                loader.load(img, { load: true });
               } catch (e) {
                 /* fall through to manual src assignment */
               }
             }
-            if (!img.getAttribute('src')) img.setAttribute('src', img.getAttribute('data-src'));
+            if (!img.getAttribute('src') && img.getAttribute('data-src')) {
+              img.setAttribute('src', img.getAttribute('data-src'));
+            }
             img.classList.add('loaded');
             img.setAttribute('data-loaded', 'true');
           });
@@ -297,7 +343,12 @@
           nodes.forEach(node => {
             const yNode = Y.one(node);
             if (!yNode) return;
+            // Per-block initializers — cover layout, native video, summary
+            // blocks, parallax and commerce inside the injected content.
             if (typeof SQS.initializeLayoutBlocks === 'function') SQS.initializeLayoutBlocks(Y, yNode);
+            if (typeof SQS.initializeNativeVideo === 'function') SQS.initializeNativeVideo(Y, yNode);
+            if (typeof SQS.initializeSummaryV2Block === 'function') SQS.initializeSummaryV2Block(Y, yNode);
+            if (typeof SQS.initializeParallax === 'function') SQS.initializeParallax(Y, yNode);
             if (typeof SQS.initializeCommerce === 'function') SQS.initializeCommerce(Y, yNode);
           });
           if (typeof SQS.afterBodyLoad === 'function') SQS.afterBodyLoad(Y);
@@ -307,9 +358,94 @@
       }
 
       revealLazyContent(nodes);
+      renderVideoEmbeds(nodes);
 
       window.dispatchEvent(new Event('resize'));
       window.dispatchEvent(new Event('mercury:load'));
+    }
+
+    // Re-run <script> tags inside injected markup. innerHTML / importNode never
+    // execute scripts, so Code Blocks and embeds stay inert until re-created
+    // here. External scripts run sequentially (so dependent embeds load in
+    // order) with a timeout guard; idempotent via data-sdl-ran. Scripts only
+    // run while the container is connected to the live document.
+    function executeScripts(container) {
+      if (!container) return Promise.resolve();
+      const scripts = Array.prototype.slice
+        .call(container.querySelectorAll('script:not([data-sdl-ran])'))
+        .filter(s => {
+          const t = s.getAttribute('type');
+          return !t || t === 'text/javascript' || t === 'application/javascript';
+        });
+      return scripts.reduce(
+        (chain, old) =>
+          chain.then(
+            () =>
+              new Promise(resolve => {
+                const script = document.createElement('script');
+                Array.prototype.forEach.call(old.attributes, a => script.setAttribute(a.name, a.value));
+                script.setAttribute('data-sdl-ran', '');
+                if (old.src) {
+                  let done = false;
+                  const finish = () => {
+                    if (!done) {
+                      done = true;
+                      resolve();
+                    }
+                  };
+                  script.onload = script.onerror = finish;
+                  window.setTimeout(finish, 5000); // never stall on a blocked src
+                  script.src = old.src;
+                  old.parentNode.replaceChild(script, old);
+                } else {
+                  script.textContent = old.textContent || '';
+                  old.parentNode.replaceChild(script, old);
+                  resolve();
+                }
+              })
+          ),
+        Promise.resolve()
+      );
+    }
+
+    // Hydrate Squarespace forms inside injected content. 7.1 forms are React
+    // "website components" (initializeWebsiteComponent); legacy/newsletter forms
+    // use initializeFormBlocks. Both are called to cover modern + classic forms.
+    // Run on the content in its FINAL position — React forms break if hydrated
+    // and then moved.
+    function reinitializeForms(scope) {
+      if (!scope) return;
+      const Y = window.Y;
+      const SQS = window.Squarespace;
+      if (!Y || !SQS) return;
+      const hasComponentForm = scope.querySelector(
+        '[data-definition-name="website.components.form"], .sqs-block-website-component'
+      );
+      const hasLegacyForm = scope.querySelector(
+        '.sqs-block-form, .form-block, .sqs-block-newsletter, .newsletter-block'
+      );
+      if (!hasComponentForm && !hasLegacyForm) return;
+      try {
+        if (typeof SQS.initializeWebsiteComponent === 'function') SQS.initializeWebsiteComponent(Y);
+      } catch (e) {}
+      try {
+        if (typeof SQS.initializeFormBlocks === 'function') SQS.initializeFormBlocks(Y, Y);
+      } catch (e) {}
+    }
+
+    // Block-type helpers — re-execute scripts and nudge common embed SDKs.
+    async function initializeCodeBlocks(el) {
+      await executeScripts(el);
+    }
+    async function initializeEmbedBlocks(el) {
+      await executeScripts(el);
+      try { window.instgrm && window.instgrm.Embeds && window.instgrm.Embeds.process(); } catch (e) {}
+      try { window.twttr && window.twttr.widgets && window.twttr.widgets.load(el); } catch (e) {}
+      try { window.FB && window.FB.XFBML && window.FB.XFBML.parse(el); } catch (e) {}
+    }
+    async function initializeThirdPartyPlugins(el) {
+      await executeScripts(el);
+      try { el.dispatchEvent(new CustomEvent('sdl:contentReady', { bubbles: true })); } catch (e) {}
     }
 
     /* ---------------------------------------------------------------- *
@@ -460,6 +596,40 @@
       window.setTimeout(run, 450);
     }
 
+    // Render Squarespace video embed blocks from their data-html attribute.
+    // 7.1 video blocks are React components whose visitor module fails to load
+    // in fetched/injected content (leaving the video blank). This builds the
+    // iframe directly from the server-rendered data-html and strips the
+    // hydration marker to suppress the console error.
+    function renderVideoEmbeds(scope) {
+      resolveNodes(scope).forEach(node => {
+        node.querySelectorAll('.sqs-video-wrapper[data-html]').forEach(wrap => {
+          const component = wrap.closest('[data-website-component-id]');
+          if (component) component.removeAttribute('data-website-component-id');
+          if (wrap.querySelector('iframe')) return;
+          const html = wrap.getAttribute('data-html');
+          if (!html) return;
+          const tmp = document.createElement('div');
+          tmp.innerHTML = html;
+          const iframe = tmp.querySelector('iframe');
+          if (iframe) wrap.appendChild(iframe);
+        });
+      });
+    }
+
+    // Backfill data-section-theme on injected sections that lack it so fetched
+    // sections keep their colour themes in the live document.
+    function handleAddingMissingColorTheme() {
+      try {
+        document.querySelectorAll('.page-section:not([data-section-theme])').forEach(section => {
+          const themed = section.closest('[data-section-theme]');
+          if (themed) section.dataset.sectionTheme = themed.dataset.sectionTheme;
+        });
+      } catch (e) {
+        /* no-op */
+      }
+    }
+
     // Best-effort re-init of other SDL plugins on the page (no-op if none).
     function initializeAllPlugins() {
       /* intentionally minimal — fetched content is handled by reloadSquarespaceLifecycle */
@@ -475,6 +645,13 @@
       revealLazyContent,
       relayoutContent,
       layoutGalleries,
+      renderVideoEmbeds,
+      executeScripts,
+      reinitializeForms,
+      initializeCodeBlocks,
+      initializeEmbedBlocks,
+      initializeThirdPartyPlugins,
+      handleAddingMissingColorTheme,
       initializeAllPlugins,
     };
   })();
@@ -669,6 +846,16 @@
         if (wasAppended) {
           originalParent.appendChild(this.el);
           this.el.classList.remove('moving-tabs-for-initialization');
+        }
+
+        // Forms and video embeds must be initialised in their FINAL position:
+        // React forms break if hydrated and then moved, and video iframes are
+        // built from the now-settled markup.
+        try {
+          if (typeof sdl$.reinitializeForms === 'function') sdl$.reinitializeForms(this.el);
+          if (typeof sdl$.renderVideoEmbeds === 'function') sdl$.renderVideoEmbeds(this.el);
+        } catch (error) {
+          console.error('Error initializing forms/video:', error);
         }
 
         sdl$?.emitEvent(`${sdlTabs.pluginTitle}:ready`);
@@ -1580,6 +1767,7 @@
       if (this.activeTab.panel && !this.activeTab.panel.dataset.sdlRevealed) {
         this.activeTab.panel.dataset.sdlRevealed = 'true';
         sdl$.revealLazyContent(this.activeTab.panel);
+        sdl$.renderVideoEmbeds(this.activeTab.panel);
         sdl$.relayoutContent(this.activeTab.panel);
       }
 
